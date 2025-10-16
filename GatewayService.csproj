@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>680ef949-6f4e-4133-bd68-506173b4a1c1</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CSRedisCore" Version="3.8.806" />
+    <PackageReference Include="JWT" Version="11.0.0" />
+    <PackageReference Include="MethodTimer.Fody" Version="3.2.3" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1" />
+    <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Common\LuoliCommon\LuoliCommon.csproj" />
+    <ProjectReference Include="..\..\Common\LuoliUtils\LuoliUtils.csproj" />
+    <ProjectReference Include="..\..\Common\ThirdApis\ThirdApis.csproj" />
+  </ItemGroup>
+
+</Project>
