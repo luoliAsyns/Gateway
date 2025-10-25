@@ -1,4 +1,5 @@
-﻿using GatewayService.Services.Coupon;
+﻿using GatewayService.Services.ConsumeInfo;
+using GatewayService.Services.Coupon;
 using GatewayService.Services.ExternalOrder;
 using LuoliCommon;
 using LuoliCommon.Logger;
@@ -22,8 +23,10 @@ namespace GatewayService
         public static List<string> NotifyUsers;
         private static bool init()
         {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+
             bool result = false;
-            string configFolder = "/app/ExternalOrder/configs";
+            string configFolder = "/app/Gateway/configs";
 
 #if DEBUG
             configFolder = "debugConfigs";
@@ -85,41 +88,47 @@ namespace GatewayService
             builder.Services.AddScoped<AsynsApis>(provider =>
             {
                 ILogger logger = provider.GetRequiredService<ILogger>();
+#if DEBUG
                 return new AsynsApis(logger, Config.KVPairs["AsynsApiUrl"]);
+#endif
+                // 生产环境不指定 url，走默认地址
+                return new AsynsApis(logger,string.Empty);
             });
             builder.Services.AddScoped<AgisoApis>();
 
+            builder.Services.AddScoped<SexyteaApis>();
+
             builder.Services.AddScoped<IExternalOrderRepository, ExternalOrderRepository>();
             builder.Services.AddScoped<ICouponRepository, CouponRepository>();
+            builder.Services.AddScoped<IConsumeInfoRepository, ConsumeInfoRepository>();
 
-
-            #region ���ILogger
+            #region 注册 ILogger
 
             builder.Services.AddHttpClient("LokiHttpClient")
                 .ConfigureHttpClient(client =>
                 {
-                    // ��������ͳһ���� HttpClient�������SSL ���ԣ������������ã�
                     // client.DefaultRequestHeaders.Add("X-Custom-Header", "luoli-app");
                 });
 
-            //�����Ƕ�ԭʼhttp client logger����filter
+            // 给默认的Logger添加filter
             builder.Logging.AddFilter(
                 "System.Net.Http.HttpClient.LokiHttpClient",
                 LogLevel.Warning
             );
 
-            // ע��LokiLogger�������񣨷�װ��־������
-            builder.Services.AddSingleton<ILogger, LokiLogger>(provider =>
+            // 添加 luoli的 ILogger   loki logger
+            builder.Services.AddSingleton<LuoliCommon.Logger.ILogger, LokiLogger>(provider =>
             {
                 var httpClient = provider.GetRequiredService<IHttpClientFactory>()
                     .CreateClient("LokiHttpClient");
 
+                var dict = new Dictionary<string, string>();
+                dict["app"] = Config.ServiceName;
+
                 var loki = new LokiLogger(Config.KVPairs["LokiEndPoint"],
-                    new Dictionary<string, string>(),
+                    dict,
                     httpClient);
                 loki.AfterLog = (msg) => Console.WriteLine(msg);
-
-                ActionsOperator.Initialize(loki);
                 return loki;
             });
 
@@ -127,10 +136,9 @@ namespace GatewayService
 
             #endregion
 
-            #region ���rabbitmq
+            #region 注册 rabbitmq
 
-            // ע��RabbitMQ���ӹ���
-            builder.Services.AddScoped<RabbitMQ.Client.IConnectionFactory>(provider =>
+            builder.Services.AddSingleton<RabbitMQ.Client.IConnectionFactory>(provider =>
             {
                 return new ConnectionFactory
                 {
@@ -139,21 +147,18 @@ namespace GatewayService
                     UserName = RabbitMQConnection.UserId,
                     Password = RabbitMQConnection.UserId,
                     VirtualHost = "/",
-                    // ����ʧ��ʱ�Զ�����
                     AutomaticRecoveryEnabled = true,
                     NetworkRecoveryInterval = TimeSpan.FromSeconds(5)
                 };
             });
 
-            // ע��RabbitMQ����
-            builder.Services.AddScoped<IConnection>(provider =>
+            builder.Services.AddSingleton<IConnection>(provider =>
             {
                 var factory = provider.GetRequiredService<RabbitMQ.Client.IConnectionFactory>();
                 return factory.CreateConnectionAsync().Result;
             });
 
-            // ע��RabbitMQͨ��
-            builder.Services.AddScoped<IChannel>(provider =>
+            builder.Services.AddSingleton<IChannel>(provider =>
             {
                 var connection = provider.GetRequiredService<IConnection>();
                 return connection.CreateChannelAsync().Result;
@@ -168,29 +173,30 @@ namespace GatewayService
 
             #region luoli code
 
-            // Ӧ��������ͨ������������ȡ LokiLogger ʵ��
+            // 应用启动后，通过服务容器获取 LokiLogger 实例
             using (var scope = app.Services.CreateScope())
             {
                 var services = scope.ServiceProvider;
                 try
                 {
-                    // ��ȡ LokiLogger ʵ��
+                    // 获取 LokiLogger 实例
                     var lokiLogger = services.GetRequiredService<LuoliCommon.Logger.ILogger>();
-
-                    lokiLogger.Info("app starting");
-                    lokiLogger.Debug($"env:{app.Environment.EnvironmentName}, listening: {Config.BindAddr}");
-
 
                     var assembly = Assembly.GetExecutingAssembly();
                     var fileVersionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(assembly.Location);
                     var fileVersion = fileVersionInfo.FileVersion;
+
+                    // 记录启动日志
+                    lokiLogger.Info($"{Config.ServiceName} v{fileVersion} 启动成功");
+                    lokiLogger.Debug($"环境:{app.Environment.EnvironmentName},端口：{Config.BindAddr}");
 
                     lokiLogger.Info($"CurrentDirectory:[{Environment.CurrentDirectory}]");
                     lokiLogger.Info($"Current File Version:[{fileVersion}]");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"while using loki:{ex.Message}");
+                    // 启动日志失败时降级输出
+                    Console.WriteLine($"启动日志记录失败：{ex.Message}");
                 }
             }
 

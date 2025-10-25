@@ -3,7 +3,7 @@
 using Grpc.Core;
 using LuoliCommon.DTO.Coupon;
 using LuoliCommon.DTO.ExternalOrder;
-using LuoliCommon.DTO.Sexytea;
+
 using LuoliCommon.Entities;
 using LuoliUtils;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -52,9 +52,14 @@ namespace GatewayService.Services.Coupon
             return await _asynsApis.CouponQuery(coupon);
         }
 
-        public async Task<ApiResponse<bool>> Update(CouponDTO dto)
+        public async Task<ApiResponse<CouponDTO>> Query(string from_platform, string tid)
         {
-            return await _asynsApis.CouponUpdate(dto);
+            return await _asynsApis.CouponQuery(from_platform, tid);
+        }
+
+        public async Task<ApiResponse<bool>> Update(LuoliCommon.DTO.Coupon.UpdateRequest ur)
+        {
+            return await _asynsApis.CouponUpdate(ur);
         }
 
         public async Task<ApiResponse<List<CouponDTO>>> Validate(string[] coupons, byte? status = null)

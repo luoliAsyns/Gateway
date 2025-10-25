@@ -15,13 +15,9 @@ namespace GatewayService.Services.ExternalOrder
         {
             _asynsApis = asynsApis;
         }
-        public async Task<ApiResponse<bool>> Delete(ExternalOrderDTO dto)
+        public async Task<ApiResponse<bool>> Delete(LuoliCommon.DTO.ExternalOrder.DeleteRequest ur)
         {
-            var result = await _asynsApis.ExternalOrderDelete(new DeleteRequest()
-            {
-                from_platform = dto.FromPlatform,
-                tid = dto.Tid,
-            });
+            var result = await _asynsApis.ExternalOrderDelete(ur);
 
             return result;
         }
@@ -53,9 +49,9 @@ namespace GatewayService.Services.ExternalOrder
             return result;
         }
 
-        public async Task<ApiResponse<bool>> Update(ExternalOrderDTO dto)
+        public async Task<ApiResponse<bool>> Update(UpdateRequest ur)
         {
-            var result = await _asynsApis.ExternalOrderUpdate(dto);
+            var result = await _asynsApis.ExternalOrderUpdate(ur);
             return result;
         }
     }

@@ -1,30 +1,57 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER $APP_UID
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
-
-# This stage is used to build the service project
+# 构建阶段
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
-WORKDIR /src
-COPY ["GatewayService/GatewayService.csproj", "GatewayService/"]
-RUN dotnet restore "./GatewayService/GatewayService.csproj"
-COPY . .
-WORKDIR "/src/GatewayService"
-RUN dotnet build "./GatewayService.csproj" -c $BUILD_CONFIGURATION -o /app/build
+ARG COMMON_REPO=https://github.com/luoliAsyns/Common.git
 
-# This stage is used to publish the service project to be copied to the final stage
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# 1. 安装 locales 包（用于生成 UTF-8 编码）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    locales \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. 生成 zh_CN.UTF-8 编码（支持中文）
+RUN locale-gen zh_CN.UTF-8
+
+# 3. 设置容器内的默认编码为 UTF-8
+ENV LANG=zh_CN.UTF-8 \
+    LC_ALL=zh_CN.UTF-8 \
+    LANGUAGE=zh_CN.UTF-8
+
+    
+# 设置工作目录为项目根目录（Dockerfile所在目录）
+WORKDIR /src
+
+
+# 克隆Common仓库
+# 使用GitHub token进行认证，避免公共仓库的API限制或访问私有仓库
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+        git clone https://$GITHUB_TOKEN@$(echo $COMMON_REPO | sed 's/^https:\/\///') Common; \
+    else \
+        git clone $COMMON_REPO Common; \
+    fi
+    
+RUN mv /src/Common /Common/
+
+COPY . ./ConsumeInfoService/
+
+# 确保工作目录正确指向项目文件
+WORKDIR "/src/ConsumeInfoService"
+
+
+# 先还原依赖，确保能找到Common项目
+RUN dotnet restore "./ConsumeInfoService.csproj"
+
+# 构建项目
+RUN dotnet build "./ConsumeInfoService.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+# 发布阶段
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./GatewayService.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./ConsumeInfoService.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+# 运行阶段
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "GatewayService.dll"]
+ENTRYPOINT ["dotnet", "ConsumeInfoService.dll"]
