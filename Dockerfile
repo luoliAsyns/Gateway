@@ -33,25 +33,25 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
     
 RUN mv /src/Common /Common/
 
-COPY . ./ConsumeInfoService/
+COPY . ./GatewayService/
 
 # 确保工作目录正确指向项目文件
-WORKDIR "/src/ConsumeInfoService"
+WORKDIR "/src/GatewayService"
 
 
 # 先还原依赖，确保能找到Common项目
-RUN dotnet restore "./ConsumeInfoService.csproj"
+RUN dotnet restore "./GatewayService.csproj"
 
 # 构建项目
-RUN dotnet build "./ConsumeInfoService.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "./GatewayService.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 # 发布阶段
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./ConsumeInfoService.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./GatewayService.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # 运行阶段
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "ConsumeInfoService.dll"]
+ENTRYPOINT ["dotnet", "GatewayService.dll"]
