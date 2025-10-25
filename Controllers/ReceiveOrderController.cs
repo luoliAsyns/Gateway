@@ -62,7 +62,7 @@ namespace GatewayService.Controllers
             long timestamp = Request.Query.ContainsKey("timestamp") ? long.Parse(Request.Query["timestamp"]) : 0;
             long aopic= Request.Query.ContainsKey("aopic") ? long.Parse(Request.Query["aopic"]) : 0;
             string sign= Request.Query.ContainsKey("sign") ? Request.Query["sign"].ToString() : string.Empty;
-            string fromPlatform= Request.Query.ContainsKey("from_platform") ? Request.Query["from_platform"].ToString() : string.Empty;
+            string fromPlatform= Request.Query.ContainsKey("fromPlatform") ? Request.Query["fromPlatform"].ToString() : string.Empty;
 
             _logger.Info($"received: fromPlatform:{fromPlatform}, timestamp:{timestamp}, aopic:{aopic}, sign:{sign}");
 
