@@ -1,6 +1,7 @@
 ﻿using LuoliCommon.DTO.Coupon;
 using LuoliCommon.DTO.ExternalOrder;
 using LuoliCommon.Entities;
+using LuoliCommon.Enums;
 
 namespace GatewayService.Services.Coupon
 {
@@ -8,7 +9,7 @@ namespace GatewayService.Services.Coupon
     {
         Task<ApiResponse<CouponDTO>> Query(string coupon);
         Task<ApiResponse<CouponDTO>> Query(string from_platform, string tid);
-        Task<ApiResponse<List<CouponDTO>>> Validate(string[] coupons,  byte? status=null);
+        Task<ApiResponse<List<CouponDTO>>> Validate(string[] coupons,  ECouponStatus status= ECouponStatus.Default);
         Task<ApiResponse<bool>> Invalidate(string coupon);
         Task<ApiResponse<PageResult<CouponDTO>>> PageQuery(int page,
             int size,

@@ -5,6 +5,7 @@ using LuoliCommon.DTO.Coupon;
 using LuoliCommon.DTO.ExternalOrder;
 
 using LuoliCommon.Entities;
+using LuoliCommon.Enums;
 using LuoliUtils;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Drawing;
@@ -62,7 +63,7 @@ namespace GatewayService.Services.Coupon
             return await _asynsApis.CouponUpdate(ur);
         }
 
-        public async Task<ApiResponse<List<CouponDTO>>> Validate(string[] coupons, byte? status = null)
+        public async Task<ApiResponse<List<CouponDTO>>> Validate(string[] coupons, ECouponStatus status = ECouponStatus.Default)
         {
             return await _asynsApis.CouponValidate(coupons, status);
         }

@@ -22,7 +22,6 @@ namespace GatewayService.Controllers
 {
   
 
-    [Time]
     [Route("api/gateway/prod")]
     public class ReceiveOrderController : Controller
     {
@@ -57,6 +56,7 @@ namespace GatewayService.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("agiso-pull")]
+        [Time]
         public async Task<ActionResult> ReceiveExternalOrder()
         {
             long timestamp = Request.Query.ContainsKey("timestamp") ? long.Parse(Request.Query["timestamp"]) : 0;
@@ -133,6 +133,7 @@ namespace GatewayService.Controllers
                 return BadRequest(notFound);
             }
 
+            //System.IO.File.WriteAllText("4835278155226513614_TradeInfo", JsonSerializer.Serialize(tradeInfoDTO));
 
             try
             {
@@ -151,7 +152,7 @@ namespace GatewayService.Controllers
 
                 //把整个dto 丢给rabbit mq
                 await _channel.BasicPublishAsync(exchange: string.Empty,
-                   routingKey: RabbitMQKeys.ExternalOrderInserting,
+                   routingKey: Program.Config.KVPairs["StartWith"] +  RabbitMQKeys.ExternalOrderInserting,
                    true,
                    _rabbitMQMsgProps,
                   Encoding.UTF8.GetBytes(JsonSerializer.Serialize(dto)));
@@ -248,6 +249,7 @@ namespace GatewayService.Controllers
 
         [HttpGet]
         [Route("refresh-sse")]
+        [Time]
         public async Task BindSSE([FromQuery] string coupon)
         {
             Response.ContentType = "text/event-stream";

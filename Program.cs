@@ -192,6 +192,9 @@ namespace GatewayService
 
                     lokiLogger.Info($"CurrentDirectory:[{Environment.CurrentDirectory}]");
                     lokiLogger.Info($"Current File Version:[{fileVersion}]");
+
+                    ApiCaller.NotifyAsync($"{Config.ServiceName}.{Config.ServiceId} v{fileVersion} 启动了", NotifyUsers);
+
                 }
                 catch (Exception ex)
                 {

@@ -186,7 +186,7 @@ namespace GatewayService.Controllers
             try
             {
                 await _channel.BasicPublishAsync(exchange: string.Empty,
-                 routingKey: RabbitMQKeys.ConsumeInfoInserting,
+                 routingKey: Program.Config.KVPairs["StartWith"] + RabbitMQKeys.ConsumeInfoInserting,
                  true,
                  _rabbitMQMsgProps,
                 Encoding.UTF8.GetBytes(JsonSerializer.Serialize(consumeInfo)));
@@ -195,7 +195,7 @@ namespace GatewayService.Controllers
                 response.msg = "sent consumeInfo to MQ success";
                 response.code = EResponseCode.Success;
 
-                _logger.Info($"sent consumeInfo with coupon[{consumeInfo.Coupon}] to MQ [{RabbitMQKeys.ConsumeInfoInserting}] success");
+                _logger.Info($"sent consumeInfo with coupon[{consumeInfo.Coupon}] to MQ [{Program.Config.KVPairs["StartWith"] + RabbitMQKeys.ConsumeInfoInserting}] success");
 
                 return response;
             }
