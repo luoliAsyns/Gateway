@@ -88,11 +88,8 @@ namespace GatewayService
             builder.Services.AddScoped<AsynsApis>(provider =>
             {
                 ILogger logger = provider.GetRequiredService<ILogger>();
-#if DEBUG
                 return new AsynsApis(logger, Config.KVPairs["AsynsApiUrl"]);
-#endif
-                // 生产环境不指定 url，走默认地址
-                return new AsynsApis(logger,string.Empty);
+               
             });
             builder.Services.AddScoped<AgisoApis>();
 
