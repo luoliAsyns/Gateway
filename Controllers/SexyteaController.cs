@@ -29,10 +29,13 @@ namespace GatewayService.Controllers
         private readonly IChannel _channel;
         private readonly ILogger _logger;
         private readonly SexyteaApis _sexyteaApis;
+        private readonly AsynsApis _asynsApis;
+    
 
         public SexyteaController(IExternalOrderRepository orderRepository, ICouponRepository couponService, ILogger logger,
-           IConsumeInfoRepository consumeInfoRepository, IChannel channel, SexyteaApis sexyteaApis)
+           IConsumeInfoRepository consumeInfoRepository, IChannel channel, SexyteaApis sexyteaApis, AsynsApis asynsApis)
         {
+            _asynsApis = asynsApis;
             _externalOrderRepository = orderRepository;
             _couponRepository = couponService;
             _consumeInfoRepository = consumeInfoRepository;
@@ -185,11 +188,14 @@ namespace GatewayService.Controllers
 
             try
             {
+               
                 await _channel.BasicPublishAsync(exchange: string.Empty,
                  routingKey: Program.Config.KVPairs["StartWith"] + RabbitMQKeys.ConsumeInfoInserting,
                  true,
                  _rabbitMQMsgProps,
                 Encoding.UTF8.GetBytes(JsonSerializer.Serialize(consumeInfo)));
+
+                System.IO.File.WriteAllText("consumeInfo", JsonSerializer.Serialize(consumeInfo));
 
                 response.data = true;
                 response.msg = "sent consumeInfo to MQ success";
@@ -213,17 +219,27 @@ namespace GatewayService.Controllers
 
         [HttpGet]
         [Route("order")]
-        public async Task<ApiResponse<dynamic>> GetOrder([FromQuery] string orderNo)
+        public async Task<ApiResponse<dynamic>> GetOrder([FromQuery] string coupon)
         {
-            _logger.Info($"trigger SexyteaController.GetOrder with orderNo:[{orderNo}] ");
+
+            _logger.Info($"trigger SexyteaController.GetOrder with coupon:[{coupon}] ");
             ApiResponse<dynamic> response = new ApiResponse<dynamic>();
 
             response.data = null;
             response.code =  EResponseCode.Fail;
 
+            var couponDto = await _couponRepository.Query(coupon);
+            if(couponDto.data?.ProxyOrderId.Length < 3)
+            {
+                response.msg = "订单处理中";
+                response.data = null;
+                return response;
+            }
+
+
             var account = await RedisHelper.GetAsync<Account>("sexytea.token");
 
-            var order = await _sexyteaApis.GetOrderInfo(account, orderNo);
+            var order = await _sexyteaApis.GetOrderInfo(account, couponDto.data.ProxyOrderId);
 
             if (order is null)
             {

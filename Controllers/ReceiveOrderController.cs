@@ -2,6 +2,8 @@
 using GatewayService.Services.ExternalOrder;
 using LuoliCommon;
 using LuoliCommon.DTO.Agiso;
+using LuoliCommon.DTO.ConsumeInfo;
+using LuoliCommon.DTO.Coupon;
 using LuoliCommon.DTO.ExternalOrder;
 using LuoliCommon.Entities;
 using LuoliCommon.Enums;
@@ -30,13 +32,15 @@ namespace GatewayService.Controllers
         private readonly ILogger _logger;
         private readonly IChannel _channel;
         private readonly AgisoApis _agisoApis;
+        private readonly AsynsApis _asynsApis;
 
         public ReceiveOrderController(IExternalOrderRepository orderRepository,
             ICouponRepository couponService, 
             IChannel channel,
             AgisoApis agisoApis,
-            ILogger logger)
+            ILogger logger, AsynsApis asynsApis)
         {
+            _asynsApis = asynsApis;
             _externalOrderRepository = orderRepository;
             _couponRepository = couponService;
             _logger = logger;
@@ -290,7 +294,7 @@ namespace GatewayService.Controllers
                     }
                 };
 
-                subcriber = RedisHelper.Subscribe((RedisKeys.Pub_RefreshShipStatus, receiveMsg));
+                subcriber = RedisHelper.Subscribe((RedisKeys.Pub_RefreshPlaceOrderStatus, receiveMsg));
                 await Task.Delay(-1, cancellationToken);
             }
             catch (Exception ex)
@@ -305,9 +309,6 @@ namespace GatewayService.Controllers
 
         }
 
-
-
-
         private static void Notify(OrderCreateRequest ocRequest, string coreMsg)
         {
             ApiCaller.NotifyAsync(
@@ -321,7 +322,26 @@ msg:{coreMsg}
 订单状态:{ocRequest.Status}", Program.NotifyUsers);
         }
 
+        [HttpGet]
+        [Route("coupon")]
+        [Time]
+        public async Task<ApiResponse<CouponDTO>> QueryCoupon(string coupon)
+        {
+            _logger.Info($"trigger ReceiveOrder.QueryCoupon with coupon[{coupon}]");
 
+            return await _couponRepository.Query(coupon);
+        }
+
+
+        [HttpGet]
+        [Route("consume-info")]
+        [Time]
+        public async Task<ApiResponse<ConsumeInfoDTO>> QueryConsumeInfo(string goodsType, string coupon)
+        {
+            _logger.Info($"trigger ReceiveOrder.QueryConsumeInfo with goodsType[{goodsType}],coupon[{coupon}]");
+
+            return await _asynsApis.ConsumeInfoQuery(goodsType,coupon);
+        }
     }
 
 }
