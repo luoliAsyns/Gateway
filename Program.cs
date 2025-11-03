@@ -1,6 +1,4 @@
-﻿using GatewayService.Services.ConsumeInfo;
-using GatewayService.Services.Coupon;
-using GatewayService.Services.ExternalOrder;
+﻿
 using LuoliCommon;
 using LuoliCommon.Logger;
 using LuoliHelper.Utils;
@@ -10,6 +8,9 @@ using RabbitMQ.Client;
 using System.Data;
 using System.Reflection;
 using ThirdApis;
+using ThirdApis.Services.ConsumeInfo;
+using ThirdApis.Services.Coupon;
+using ThirdApis.Services.ExternalOrder;
 using ILogger = LuoliCommon.Logger.ILogger;
 
 namespace GatewayService
@@ -202,6 +203,7 @@ namespace GatewayService
 
 
             #endregion
+
 
             app.MapControllers();
 

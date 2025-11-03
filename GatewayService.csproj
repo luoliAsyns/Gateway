@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -7,7 +7,7 @@
     <UserSecretsId>680ef949-6f4e-4133-bd68-506173b4a1c1</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <AssemblyVersion>25</AssemblyVersion>
-    <FileVersion>25.10.30.3</FileVersion>
+    <FileVersion>25.11.3.1</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

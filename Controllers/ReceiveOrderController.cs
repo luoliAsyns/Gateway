@@ -1,6 +1,4 @@
-﻿using GatewayService.Services.Coupon;
-using GatewayService.Services.ExternalOrder;
-using LuoliCommon;
+﻿using LuoliCommon;
 using LuoliCommon.DTO.Agiso;
 using LuoliCommon.DTO.ConsumeInfo;
 using LuoliCommon.DTO.Coupon;
@@ -16,6 +14,9 @@ using System.Text;
 using System.Text.Json;
 using System.Web;
 using ThirdApis;
+using ThirdApis.Services.ConsumeInfo;
+using ThirdApis.Services.Coupon;
+using ThirdApis.Services.ExternalOrder;
 using static CSRedis.CSRedisClient;
 using static Grpc.Core.Metadata;
 using ILogger = LuoliCommon.Logger.ILogger;
@@ -27,24 +28,30 @@ namespace GatewayService.Controllers
     [Route("api/gateway/prod")]
     public class ReceiveOrderController : Controller
     {
+
         private readonly IExternalOrderRepository _externalOrderRepository;
         private readonly ICouponRepository _couponRepository;
+        private readonly IConsumeInfoRepository _consumeInfoRepository;
+
         private readonly ILogger _logger;
         private readonly IChannel _channel;
         private readonly AgisoApis _agisoApis;
-        private readonly AsynsApis _asynsApis;
 
-        public ReceiveOrderController(IExternalOrderRepository orderRepository,
+        public ReceiveOrderController(
+            IExternalOrderRepository orderRepository,
             ICouponRepository couponService, 
+            IConsumeInfoRepository consumeInfoRepository,
             IChannel channel,
             AgisoApis agisoApis,
-            ILogger logger, AsynsApis asynsApis)
+            ILogger logger)
         {
-            _asynsApis = asynsApis;
             _externalOrderRepository = orderRepository;
             _couponRepository = couponService;
+            _consumeInfoRepository = consumeInfoRepository;
+
             _logger = logger;
             _channel = channel;
+
             _agisoApis =agisoApis;
             _rabbitMQMsgProps.ContentType = "text/plain";
             _rabbitMQMsgProps.DeliveryMode = DeliveryModes.Persistent;
@@ -124,7 +131,6 @@ namespace GatewayService.Controllers
                 return BadRequest("existed in redis already, should be duplicate");
 
             //OrderCreateRequest 要转成 ExternalOrderDTO
-            //ExternalOrderDTO dto = orderCreateDto.ToExternalOrderDTO();
             var (tradeInfoSuccess, tradeInfoDTO) = await _agisoApis.TradeInfo(Program.Config.KVPairs["AgisoAccessToken"],
                 Program.Config.KVPairs["AgisoAppSecret"],
                 orderCreateDto.Tid.ToString());
@@ -160,6 +166,8 @@ namespace GatewayService.Controllers
                    true,
                    _rabbitMQMsgProps,
                   Encoding.UTF8.GetBytes(JsonSerializer.Serialize(dto)));
+
+                RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedOrders);
 
                 return Ok("ok");
 
@@ -238,8 +246,7 @@ namespace GatewayService.Controllers
                     _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.FromPlatform}] tid: [{orderRefundDto.Tid}]");
                     return BadRequest("update CouponDTO failed");
                 }
-
-
+                RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
                 return Ok("ok");
 
             }
@@ -340,7 +347,7 @@ msg:{coreMsg}
         {
             _logger.Info($"trigger ReceiveOrder.QueryConsumeInfo with goodsType[{goodsType}],coupon[{coupon}]");
 
-            return await _asynsApis.ConsumeInfoQuery(goodsType,coupon);
+            return await _consumeInfoRepository.ConsumeInfoQuery(goodsType,coupon);
         }
     }
 

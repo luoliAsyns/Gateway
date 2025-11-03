@@ -1,6 +1,4 @@
-﻿using GatewayService.Services.ConsumeInfo;
-using GatewayService.Services.Coupon;
-using GatewayService.Services.ExternalOrder;
+﻿
 using LuoliCommon.DTO.ConsumeInfo;
 using LuoliCommon.DTO.ConsumeInfo.Sexytea;
 using LuoliCommon.Entities;
@@ -13,6 +11,9 @@ using RabbitMQ.Client;
 using System.Text;
 using System.Text.Json;
 using ThirdApis;
+using ThirdApis.Services.ConsumeInfo;
+using ThirdApis.Services.Coupon;
+using ThirdApis.Services.ExternalOrder;
 using ILogger = LuoliCommon.Logger.ILogger;
 
 
@@ -29,13 +30,11 @@ namespace GatewayService.Controllers
         private readonly IChannel _channel;
         private readonly ILogger _logger;
         private readonly SexyteaApis _sexyteaApis;
-        private readonly AsynsApis _asynsApis;
     
 
         public SexyteaController(IExternalOrderRepository orderRepository, ICouponRepository couponService, ILogger logger,
-           IConsumeInfoRepository consumeInfoRepository, IChannel channel, SexyteaApis sexyteaApis, AsynsApis asynsApis)
+           IConsumeInfoRepository consumeInfoRepository, IChannel channel, SexyteaApis sexyteaApis)
         {
-            _asynsApis = asynsApis;
             _externalOrderRepository = orderRepository;
             _couponRepository = couponService;
             _consumeInfoRepository = consumeInfoRepository;
@@ -238,6 +237,14 @@ namespace GatewayService.Controllers
 
 
             var account = await RedisHelper.GetAsync<Account>("sexytea.token");
+
+            if(account is null)
+            {
+                response.code = EResponseCode.Fail;
+                response.msg = "Sexytea token expired";
+                response.data = null;
+                return response;
+            }
 
             var order = await _sexyteaApis.GetOrderInfo(account, couponDto.data.ProxyOrderId);
 
