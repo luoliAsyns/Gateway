@@ -49,7 +49,7 @@ namespace GatewayService.MiddleWares
             try
             {
                 // 3. 验证令牌并获取用户信息
-                var payload = _jwtService.ValidateToken(token);
+                var payload =await _jwtService.ValidateToken(token);
 
                 // 4. 将用户信息存入上下文，供后续控制器使用
                 context.Items["User"] = payload["name"].ToString();
@@ -155,7 +155,7 @@ namespace GatewayService.MiddleWares
     public interface IJwtService
     {
         string GenerateToken( string username);
-        Dictionary<string, object> ValidateToken(string token);
+        Task<Dictionary<string, object>> ValidateToken(string token);
     }
 
     public class JwtService : IJwtService
@@ -216,5 +216,6 @@ namespace GatewayService.MiddleWares
             }
         }
 
+      
     }
 }
