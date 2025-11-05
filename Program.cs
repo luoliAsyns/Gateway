@@ -5,6 +5,7 @@ using LuoliCommon;
 using LuoliCommon.Logger;
 using LuoliHelper.Utils;
 using LuoliUtils;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using RabbitMQ.Client;
 using System.Data;
@@ -209,6 +210,14 @@ namespace GatewayService
 
             #endregion
 
+            app.UseForwardedHeaders(new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+            });
+
+            app.UseMiddleware<RateLimitMiddleware>();
+
+            app.UseMiddleware<JwtMiddleware>();
 
             app.MapControllers();
 
