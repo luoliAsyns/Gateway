@@ -1,4 +1,5 @@
 ﻿
+using GatewayService.User;
 using LuoliCommon;
 using LuoliCommon.Logger;
 using LuoliHelper.Utils;
@@ -99,6 +100,7 @@ namespace GatewayService
             builder.Services.AddScoped<IExternalOrderRepository, ExternalOrderRepository>();
             builder.Services.AddScoped<ICouponRepository, CouponRepository>();
             builder.Services.AddScoped<IConsumeInfoRepository, ConsumeInfoRepository>();
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
 
             #region 注册 ILogger
 
