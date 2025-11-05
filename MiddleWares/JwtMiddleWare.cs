@@ -30,12 +30,16 @@ namespace GatewayService.MiddleWares
             }
 
             // 1.2 检查是否是局域网或本机请求
-            if (IsLocalOrLanIp(GetClientIpAddress(context)))
+            IPAddress ip = GetClientIpAddress(context);
+
+            if (IsLocalOrLanIp(ip))
             {
+                Console.WriteLine($"ip:[{string.Join(".", ip.GetAddressBytes())}], regarded as local");
                 await _next(context);
                 return;
             }
 
+            Console.WriteLine($"ip:[{string.Join(".", ip.GetAddressBytes())}], regarded as outside");
 
             // 2. 从请求头获取令牌
             var token = GetTokenFromHeader(context);
