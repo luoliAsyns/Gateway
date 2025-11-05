@@ -3,6 +3,7 @@ using JWT.Builder;
 using JWT.Exceptions;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace GatewayService.MiddleWares
 {
@@ -21,9 +22,7 @@ namespace GatewayService.MiddleWares
         {
             // 1.1 跳过登录接口的鉴权
             if (
-                context.Request.Path.StartsWithSegments("/api/gateway/coupon/validate") ||
-                context.Request.Path.StartsWithSegments("/api/gateway/external-order/query") ||
-                context.Request.Path.StartsWithSegments("/api/gateway/sexytea/query") ||
+                context.Request.Path.StartsWithSegments("/api/gateway/prod") ||
                 context.Request.Path.StartsWithSegments("/api/gateway/admin/login"))
             {
                 await _next(context);
@@ -53,11 +52,7 @@ namespace GatewayService.MiddleWares
                 var payload = _jwtService.ValidateToken(token);
 
                 // 4. 将用户信息存入上下文，供后续控制器使用
-                context.Items["User"] = new
-                {
-                    Id = int.Parse(payload["userId"].ToString()),
-                    Username = payload["name"].ToString(),
-                };
+                context.Items["User"] = payload["name"].ToString();
 
                 // 5. 继续处理请求
                 await _next(context);
@@ -159,19 +154,19 @@ namespace GatewayService.MiddleWares
 
     public interface IJwtService
     {
-        string GenerateToken(long userId, string username);
+        string GenerateToken( string username);
         Dictionary<string, object> ValidateToken(string token);
     }
 
     public class JwtService : IJwtService
     {
         // 密钥（生产环境需妥善保管）
-        private const string SecretKey = "xixi_luoli_secret";
+        private  string SecretKey = Program.Config.KVPairs["JWTSecretKey"];
 
         /// <summary>
         /// 生成JWT令牌
         /// </summary>
-        public string GenerateToken(long userId, string username)
+        public string GenerateToken(string username)
         {
             // 令牌过期时间 60分钟
 
@@ -179,18 +174,16 @@ namespace GatewayService.MiddleWares
                       .WithAlgorithm(new HMACSHA256Algorithm())
                       .WithSecret(SecretKey) // 传入密钥
                       .AddClaim("exp", DateTimeOffset.UtcNow.AddMinutes(60).ToUnixTimeSeconds())
-                      .AddClaim("userId", userId)
                       .AddClaim("name", username)
                       .Encode();
 
-            // 生成令牌
             return token;
         }
 
         /// <summary>
         /// 验证并解析JWT令牌
         /// </summary>
-        public Dictionary<string, object> ValidateToken(string token)
+        public async Task<Dictionary<string, object>> ValidateToken(string token)
         {
             try
             {
@@ -199,7 +192,15 @@ namespace GatewayService.MiddleWares
                       .WithSecret(SecretKey) // 验证时也需要相同的密钥
                       .MustVerifySignature()
                       .Decode(token);
-                return Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+
+                var payload = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                var userName = payload["name"].ToString();
+
+
+                if (!(await RedisHelper.ExistsAsync($"admin.{userName}")))
+                    throw new Exception("token不存在于redis");
+
+                return payload;
             }
             catch (TokenExpiredException)
             {
