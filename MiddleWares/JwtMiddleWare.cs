@@ -10,15 +10,13 @@ namespace GatewayService.MiddleWares
     public class JwtMiddleware
     {
         private readonly RequestDelegate _next;
-        private readonly IJwtService _jwtService;
 
-        public JwtMiddleware(RequestDelegate next, IJwtService jwtService)
+        public JwtMiddleware(RequestDelegate next)
         {
             _next = next;
-            _jwtService = jwtService;
         }
 
-        public async Task InvokeAsync(HttpContext context)
+        public async Task InvokeAsync(HttpContext context, IJwtService jwtService)
         {
             // 1.1 跳过登录接口的鉴权
             if (
@@ -53,7 +51,7 @@ namespace GatewayService.MiddleWares
             try
             {
                 // 3. 验证令牌并获取用户信息
-                var payload =await _jwtService.ValidateToken(token);
+                var payload =await jwtService.ValidateToken(token);
 
                 // 4. 将用户信息存入上下文，供后续控制器使用
                 context.Items["User"] = payload["name"].ToString();

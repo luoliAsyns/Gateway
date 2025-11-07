@@ -56,7 +56,7 @@ namespace GatewayService.MiddleWares
             {
                 context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
                 await context.Response.WriteAsync("繁忙，请稍后重试。");
-                _logger.Warn($"有东西访问超频率了 [] [{count}]");
+                _logger.Warn($"有东西访问超频率了 [{cacheKey}] [{count}]");
 
                 await RedisHelper.SetAsync(cacheKey, LIMIT, TimeSpan.FromSeconds(WINDOW_SECONDS));
                 return;

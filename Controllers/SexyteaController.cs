@@ -27,13 +27,17 @@ namespace GatewayService.Controllers
         private readonly IExternalOrderRepository _externalOrderRepository;
         private readonly ICouponRepository _couponRepository;
         private readonly IConsumeInfoRepository _consumeInfoRepository;
+
         private readonly IChannel _channel;
         private readonly ILogger _logger;
         private readonly SexyteaApis _sexyteaApis;
     
 
-        public SexyteaController(IExternalOrderRepository orderRepository, ICouponRepository couponService, ILogger logger,
-           IConsumeInfoRepository consumeInfoRepository, IChannel channel, SexyteaApis sexyteaApis)
+        public SexyteaController(
+            IExternalOrderRepository orderRepository, 
+            ICouponRepository couponService, 
+            IConsumeInfoRepository consumeInfoRepository, 
+           ILogger logger, IChannel channel, SexyteaApis sexyteaApis)
         {
             _externalOrderRepository = orderRepository;
             _couponRepository = couponService;

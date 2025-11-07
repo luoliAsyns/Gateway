@@ -1,10 +1,18 @@
 ﻿using GatewayService.MiddleWares;
 using GatewayService.User;
+using LuoliCommon.DTO;
+using LuoliCommon.DTO.ExternalOrder;
 using LuoliCommon.DTO.User;
 using LuoliCommon.Entities;
+using LuoliUtils;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Polly;
+using System.Drawing;
+using ThirdApis.Services.ConsumeInfo;
+using ThirdApis.Services.Coupon;
+using ThirdApis.Services.ExternalOrder;
 
 namespace GatewayService.Controllers
 {
@@ -14,12 +22,22 @@ namespace GatewayService.Controllers
     {
 
         private readonly LuoliCommon.Logger.ILogger _logger;
+
         private readonly IUserRepository _userRepository;
+        private readonly IExternalOrderRepository _externalOrderRepository;
+        private readonly ICouponRepository _couponRepository;
+        private readonly IConsumeInfoRepository _consumeInfoRepository;
+
         private readonly IJwtService _jwtService;
-        public AdminController(LuoliCommon.Logger.ILogger logger, IUserRepository userRepository, IJwtService jwtService)
+        public AdminController(LuoliCommon.Logger.ILogger logger,  IJwtService jwtService,
+            IUserRepository userRepository,
+            IExternalOrderRepository externalOrderRepository,
+            ICouponRepository couponService,
+            IConsumeInfoRepository consumeInfoRepository)
         {
             _logger = logger;
             _userRepository = userRepository;
+            _externalOrderRepository = externalOrderRepository;
             _jwtService = jwtService;
         }
 
@@ -112,8 +130,6 @@ namespace GatewayService.Controllers
                 return resp;
             }
 
-
-
             resp.msg = "只能修改自己的密码";
             _logger.Error($"AdminController.ChangePassword failed: user from context[{user}], input user:[{chRequest.UserName}]");
 
@@ -121,37 +137,88 @@ namespace GatewayService.Controllers
         }
 
 
-        [HttpPost]
-        [Route("register")]
-        public async Task<ApiResponse<string>> Register([FromBody] LuoliCommon.DTO.User.RegisterRequest registerRequest)
+        [HttpGet]
+        [Route("prom")]
+        public async Task<ApiResponse<dynamic>> GetPrometheusData()
         {
+            _logger.Info($"trigger AdminController.GetPrometheusData");
 
-            string user = HttpContext.Items["User"].ToString();
-
-            _logger.Info($"trigger AdminController.ChangePassword: user from context[{user}], input user:[{registerRequest.UserName}]");
-
-            ApiResponse<string> resp = new ApiResponse<string>();
-            resp.code = LuoliCommon.Enums.EResponseCode.Fail;
-            resp.data = string.Empty;
-
-            if (user == "luoli")
+            ApiResponse<dynamic> resp = new ApiResponse<dynamic>();
+            resp.code = LuoliCommon.Enums.EResponseCode.Success;
+            resp.data = new
             {
-                RedisHelper.DelAsync($"admin.{user}");
+                Prom_ReceivedOrders = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedOrders),
+                Prom_ReceivedRefund = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedRefund),
+                Prom_CouponsGenerated = await RedisHelper.GetAsync<int>(RedisKeys.Prom_CouponsGenerated),
+                Prom_Shipped = await RedisHelper.GetAsync<int>(RedisKeys.Prom_Shipped),
+                Prom_ShipFailed = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ShipFailed),
+                Prom_ReceivedConsumeInfo = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedConsumeInfo),
+                Prom_InsertedConsumeInfo = await RedisHelper.GetAsync<int>(RedisKeys.Prom_InsertedConsumeInfo),
+                Prom_PlacedOrders = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrders),
+                Prom_PlacedOrdersFailed = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrdersFailed),
+            };
+            
+            return resp;
+        }
 
-                resp = await _userRepository.Register(registerRequest.UserName, registerRequest.Phone, registerRequest.Gender);
+        [HttpGet]
+        [Route("order-page-query")]
+        public async Task<ApiResponse<PageResult<TableItemVM>>> GetPageEOs(
+            [FromQuery] int page,
+            [FromQuery] int size,
+            [FromQuery] DateTime? startTime = null,
+            [FromQuery] DateTime? endTime = null)
+        {
+            _logger.Info($"trigger AdminController.GetPageEOs, page[{page}],size[{size}]");
 
-                RedisHelper.DelAsync($"admin.{user}");
-                resp.msg = "注册成功,初始密码在data里";
-                _logger.Info($"AdminController.Register success: new user[{registerRequest.UserName}]");
-                return resp;
+            var eoResp = await _externalOrderRepository.PageQueryAsync(page, size, startTime, endTime);
+
+
+            ApiResponse<PageResult<TableItemVM>> result = new ApiResponse<PageResult<TableItemVM>>();
+            result.data = new PageResult<TableItemVM>();
+            result.data.Page = eoResp.data.Page;
+            result.data.Total = eoResp.data.Total;
+            result.data.Size = eoResp.data.Size;
+            result.data.Items = new List<TableItemVM>();
+
+            foreach (var eo in eoResp.data.Items)
+            {
+                var couponResp = await _couponRepository.Query(eo.FromPlatform, eo.Tid);
+                var ciResp = await _consumeInfoRepository.ConsumeInfoQuery(eo.TargetProxy.ToString() + "_consume_info", couponResp.data.Coupon);
+                var tableItemVM = new TableItemVM(eo, couponResp.data, ciResp.data);
+                result.data.Items.Add(tableItemVM);
             }
 
+            // 先创建所有并行任务
+            var tasks = eoResp.data.Items.Select(async eo =>
+            {
+                var couponResp = await _couponRepository.Query(eo.FromPlatform, eo.Tid);
+                var ciResp = await _consumeInfoRepository.ConsumeInfoQuery(
+                    $"{eo.TargetProxy.ToString()}_consume_info",
+                    couponResp.data.Coupon
+                );
 
-            resp.msg = "只有luoli可以创建账号";
-            _logger.Error($"AdminController.Register failed: user from context[{user}], input user:[{registerRequest.UserName}]");
+                // 返回当前项的ViewModel
+                return new TableItemVM(eo, couponResp.data, ciResp.data);
+            }).ToList();
 
-            return resp;
+            // 等待所有任务完成并合并结果
+            var tableItems = await Task.WhenAll(tasks);
+            var sortedItems = tableItems.OrderBy(item => item.EO.CreateTime).ToList();
 
+            result.data.Items = sortedItems;
+            return result;
         }
+
+        [HttpPost]
+        [Route("coupon-invalidate")]
+        public async Task<ApiResponse<bool>> CouponInvalidate([FromBody] string coupon)
+        {
+            _logger.Info($"trigger AdminController.CouponInvalidate with coupon[{coupon}]");
+
+            return await _couponRepository.Invalidate(coupon); ; 
+        }
+
+
     }
 }
