@@ -102,6 +102,8 @@ namespace GatewayService.Controllers
             using (var reader = new StreamReader(Request.Body))
             {
                 rawJson = await reader.ReadToEndAsync();
+                rawJson = HttpUtility.UrlDecode(rawJson);
+
                 _logger.Debug($"rawJson before regex: {rawJson}");
 
                 var match = Regex.Match(rawJson, @"\{.*?\}", RegexOptions.Singleline);
@@ -109,8 +111,6 @@ namespace GatewayService.Controllers
                     rawJson = match.Value;
                 else
                     _logger.Error("正则提取失败了");
-
-                rawJson = HttpUtility.UrlDecode(rawJson);
             }
             _logger.Debug($"rawJson after regex: {rawJson}");
 
@@ -190,6 +190,8 @@ namespace GatewayService.Controllers
             using (var reader = new StreamReader(Request.Body))
             {
                 rawJson = await reader.ReadToEndAsync();
+                rawJson = HttpUtility.UrlDecode(rawJson);
+
                 _logger.Debug($"rawJson before regex: {rawJson}");
 
                 var match = Regex.Match(rawJson, @"\{.*?\}", RegexOptions.Singleline);
@@ -198,7 +200,6 @@ namespace GatewayService.Controllers
                 else
                     _logger.Error("正则提取失败了");
 
-                rawJson = HttpUtility.UrlDecode(rawJson);
             }
             _logger.Debug($"rawJson after regex: {rawJson}");
 

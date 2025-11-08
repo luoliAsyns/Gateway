@@ -27,6 +27,9 @@ namespace GatewayService.MiddleWares
                 return;
             }
 
+#if DEBUG
+
+#else
             // 1.2 检查是否是局域网或本机请求
             IPAddress ip = GetClientIpAddress(context);
 
@@ -36,8 +39,9 @@ namespace GatewayService.MiddleWares
                 await _next(context);
                 return;
             }
-
             Console.WriteLine($"ip:[{string.Join(".", ip.GetAddressBytes())}], regarded as outside");
+
+#endif
 
             // 2. 从请求头获取令牌
             var token = GetTokenFromHeader(context);

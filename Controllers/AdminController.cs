@@ -100,7 +100,7 @@ namespace GatewayService.Controllers
             resp.data = false;
 
 
-            RedisHelper.DelAsync($"admin.{user}");
+            await RedisHelper.DelAsync($"admin.{user}");
 
             resp.data = true;
             resp.code = LuoliCommon.Enums.EResponseCode.Success;
