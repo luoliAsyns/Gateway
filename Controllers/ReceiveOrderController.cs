@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using RabbitMQ.Client;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Web;
 using ThirdApis;
 using ThirdApis.Services.ConsumeInfo;
@@ -101,15 +102,18 @@ namespace GatewayService.Controllers
             using (var reader = new StreamReader(Request.Body))
             {
                 rawJson = await reader.ReadToEndAsync();
+                _logger.Debug($"rawJson before regex: {rawJson}");
 
-                rawJson = rawJson.StartsWith("json=")
-                      ? rawJson.Substring("json=".Length)
-                      : rawJson;
+                var match = Regex.Match(rawJson, @"\{.*?\}", RegexOptions.Singleline);
+                if (match.Success)
+                    rawJson = match.Value;
+                else
+                    _logger.Error("正则提取失败了");
 
                 rawJson = HttpUtility.UrlDecode(rawJson);
             }
+            _logger.Debug($"rawJson after regex: {rawJson}");
 
-            _logger.Debug($"rawJson: {rawJson}");
 
             var (validate, msg, orderCreateDto) = await _agisoApis.ValidateOrderCreateAsync(Request, rawJson);
 
@@ -186,15 +190,17 @@ namespace GatewayService.Controllers
             using (var reader = new StreamReader(Request.Body))
             {
                 rawJson = await reader.ReadToEndAsync();
+                _logger.Debug($"rawJson before regex: {rawJson}");
 
-                rawJson = rawJson.StartsWith("json=")
-                      ? rawJson.Substring("json=".Length)
-                      : rawJson;
+                var match = Regex.Match(rawJson, @"\{.*?\}", RegexOptions.Singleline);
+                if (match.Success)
+                    rawJson = match.Value;
+                else
+                    _logger.Error("正则提取失败了");
 
                 rawJson = HttpUtility.UrlDecode(rawJson);
             }
-
-            _logger.Debug($"rawJson: {rawJson}");
+            _logger.Debug($"rawJson after regex: {rawJson}");
 
             var (validate, msg, orderRefundDto) = await _agisoApis.ValidateOrderRefundAsync(Request, rawJson);
 
@@ -210,16 +216,16 @@ namespace GatewayService.Controllers
 
             string requestId = HttpContext.TraceIdentifier;
 
-            _logger.Info($"[{requestId}] trigger ReceiveOrderController.ReceiveExternalOrder, fromPlatform:[{orderRefundDto.FromPlatform}] tid: [{orderRefundDto.Tid}]");
+            _logger.Info($"[{requestId}] trigger ReceiveOrderController.ReceiveExternalOrder, fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
 
           
 
             try
             {
-                var eoResp = await _externalOrderRepository.Get(orderRefundDto.FromPlatform, orderRefundDto.Tid.ToString());
+                var eoResp = await _externalOrderRepository.Get(orderRefundDto.Platform, orderRefundDto.Tid.ToString());
                 if(!eoResp.ok || (eoResp.data is null ))
                 {
-                    _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, not found related ExternalOrderDTO with fromPlatform:[{orderRefundDto.FromPlatform}] tid: [{orderRefundDto.Tid}]");
+                    _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, not found related ExternalOrderDTO with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
                     return BadRequest("not found ExternalOrderDTO");
                 }
               
@@ -231,7 +237,7 @@ namespace GatewayService.Controllers
 
                 if (!updateEOResp.ok)
                 {
-                    _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update ExternalOrderDTO failed with fromPlatform:[{orderRefundDto.FromPlatform}] tid: [{orderRefundDto.Tid}]");
+                    _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update ExternalOrderDTO failed with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
                     return BadRequest("update ExternalOrderDTO failed");
                 }
 
@@ -243,7 +249,7 @@ namespace GatewayService.Controllers
 
                 if (!updateCouponResp.ok)
                 {
-                    _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.FromPlatform}] tid: [{orderRefundDto.Tid}]");
+                    _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
                     return BadRequest("update CouponDTO failed");
                 }
                 RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);

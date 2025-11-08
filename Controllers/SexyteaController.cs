@@ -264,5 +264,55 @@ namespace GatewayService.Controllers
             response.data = order;
             return response;
         }
+
+
+        public class sexyteaRefundReq
+        {
+            public string OrderNo { get; set; }
+        }
+
+        [HttpPost]
+        [Route("refund")]
+        public async Task<ApiResponse<bool>> Refund([FromBody] sexyteaRefundReq req)
+        {
+            string orderNo = req.OrderNo;
+
+            _logger.Info($"trigger SexyteaController.Refund with orderNo[{orderNo}] ");
+
+            ApiResponse<bool> response = new ApiResponse<bool>();
+            response.code = EResponseCode.Fail;
+            response.data = false;
+
+            try
+            {
+                var account = await RedisHelper.GetAsync<Account>("sexytea.token");
+
+                if (account is null)
+                {
+                    response.code = EResponseCode.Fail;
+                    response.msg = "Sexytea token expired";
+                    response.data = false;
+                    return response;
+                }
+
+                var refundResult = await _sexyteaApis.OrderRefund(account, orderNo);
+                response.data = refundResult.Item1;
+                response.msg = refundResult.Item2;
+                response.code = EResponseCode.Success;
+
+                _logger.Info($"SexyteaController.Refund, [{refundResult.Item1},[{refundResult.Item2}]]");
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.Refund ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = false;
+                return response;
+            }
+        }
     }
 }

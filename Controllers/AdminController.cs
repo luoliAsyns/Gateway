@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Polly;
 using System.Drawing;
+using System.Linq;
 using ThirdApis.Services.ConsumeInfo;
 using ThirdApis.Services.Coupon;
 using ThirdApis.Services.ExternalOrder;
@@ -36,8 +37,12 @@ namespace GatewayService.Controllers
             IConsumeInfoRepository consumeInfoRepository)
         {
             _logger = logger;
+
             _userRepository = userRepository;
             _externalOrderRepository = externalOrderRepository;
+            _couponRepository = couponService;
+            _consumeInfoRepository = consumeInfoRepository;
+
             _jwtService = jwtService;
         }
 
@@ -145,80 +150,141 @@ namespace GatewayService.Controllers
 
             ApiResponse<dynamic> resp = new ApiResponse<dynamic>();
             resp.code = LuoliCommon.Enums.EResponseCode.Success;
-            resp.data = new
-            {
-                Prom_ReceivedOrders = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedOrders),
-                Prom_ReceivedRefund = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedRefund),
-                Prom_CouponsGenerated = await RedisHelper.GetAsync<int>(RedisKeys.Prom_CouponsGenerated),
-                Prom_Shipped = await RedisHelper.GetAsync<int>(RedisKeys.Prom_Shipped),
-                Prom_ShipFailed = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ShipFailed),
-                Prom_ReceivedConsumeInfo = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedConsumeInfo),
-                Prom_InsertedConsumeInfo = await RedisHelper.GetAsync<int>(RedisKeys.Prom_InsertedConsumeInfo),
-                Prom_PlacedOrders = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrders),
-                Prom_PlacedOrdersFailed = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrdersFailed),
-            };
-            
+            resp.data = new[]
+                 {
+                    new
+                    {
+                        name = "拉取订单",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedOrders)
+                    },
+                    new
+                    {
+                        name = "收到退款请求",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedRefund)
+                    },
+                    new
+                    {
+                        name = "生成卡密",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_CouponsGenerated)
+                    },
+                    new
+                    {
+                        name = "发货成功",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_Shipped)
+                    },
+                    new
+                    {
+                        name = "发货失败",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ShipFailed)
+                    },
+                    new
+                    {
+                        name = "收到消费信息",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedConsumeInfo)
+                    },
+                    new
+                    {
+                        name = "插入消费信息",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_InsertedConsumeInfo)
+                    },
+                    new
+                    {
+                        name = "代理下单成功",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrders)
+                    },
+                    new
+                    {
+                        name = "代理下单失败",
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrdersFailed)
+                    }
+                };
+
             return resp;
         }
 
         [HttpGet]
         [Route("order-page-query")]
-        public async Task<ApiResponse<PageResult<TableItemVM>>> GetPageEOs(
+        public async Task<ApiResponse<PageResult<TableItemVM>>> GetPageOrders(
             [FromQuery] int page,
             [FromQuery] int size,
             [FromQuery] DateTime? startTime = null,
-            [FromQuery] DateTime? endTime = null)
+            [FromQuery] DateTime? endTime = null,
+            [FromQuery] byte? couponStatus = null)
         {
-            _logger.Info($"trigger AdminController.GetPageEOs, page[{page}],size[{size}]");
+            _logger.Info($"trigger AdminController.GetPageOrders, page[{page}],size[{size}]");
 
-            var eoResp = await _externalOrderRepository.PageQueryAsync(page, size, startTime, endTime);
+            var couponResp = await _couponRepository.PageQuery(page, size, couponStatus, startTime, endTime );
 
 
             ApiResponse<PageResult<TableItemVM>> result = new ApiResponse<PageResult<TableItemVM>>();
             result.data = new PageResult<TableItemVM>();
-            result.data.Page = eoResp.data.Page;
-            result.data.Total = eoResp.data.Total;
-            result.data.Size = eoResp.data.Size;
+            result.data.Page = couponResp.data.Page;
+            result.data.Total = couponResp.data.Total;
+            result.data.Size = couponResp.data.Size;
             result.data.Items = new List<TableItemVM>();
 
-            foreach (var eo in eoResp.data.Items)
-            {
-                var couponResp = await _couponRepository.Query(eo.FromPlatform, eo.Tid);
-                var ciResp = await _consumeInfoRepository.ConsumeInfoQuery(eo.TargetProxy.ToString() + "_consume_info", couponResp.data.Coupon);
-                var tableItemVM = new TableItemVM(eo, couponResp.data, ciResp.data);
-                result.data.Items.Add(tableItemVM);
-            }
+           
 
             // 先创建所有并行任务
-            var tasks = eoResp.data.Items.Select(async eo =>
+            var tasks = couponResp.data.Items.Select(async coupon =>
             {
-                var couponResp = await _couponRepository.Query(eo.FromPlatform, eo.Tid);
+                var eoResp = await _externalOrderRepository.Get(coupon.ExternalOrderFromPlatform , coupon.ExternalOrderTid);
                 var ciResp = await _consumeInfoRepository.ConsumeInfoQuery(
-                    $"{eo.TargetProxy.ToString()}_consume_info",
-                    couponResp.data.Coupon
+                    $"{eoResp.data.TargetProxy.ToString()}_consume_info",
+                    coupon.Coupon
                 );
 
                 // 返回当前项的ViewModel
-                return new TableItemVM(eo, couponResp.data, ciResp.data);
+                return new TableItemVM(eoResp.data, coupon, ciResp.data);
             }).ToList();
 
             // 等待所有任务完成并合并结果
             var tableItems = await Task.WhenAll(tasks);
-            var sortedItems = tableItems.OrderBy(item => item.EO.CreateTime).ToList();
+            var sortedItems = tableItems.OrderByDescending(item => item.EO.CreateTime).ToList();
 
             result.data.Items = sortedItems;
             return result;
         }
 
-        [HttpPost]
-        [Route("coupon-invalidate")]
-        public async Task<ApiResponse<bool>> CouponInvalidate([FromBody] string coupon)
-        {
-            _logger.Info($"trigger AdminController.CouponInvalidate with coupon[{coupon}]");
 
-            return await _couponRepository.Invalidate(coupon); ; 
+        [HttpGet]
+        [Route("order-tid-query")]
+        public async Task<ApiResponse<TableItemVM>> GetEO(
+            [FromQuery] string tid,
+            [FromQuery] string fromPlatform)
+        {
+
+            _logger.Info($"trigger AdminController.GetEO, tid[{tid}],fromPlatform [{fromPlatform}]");
+
+            var eoResp = await _externalOrderRepository.Get(fromPlatform, tid);
+
+
+            ApiResponse<TableItemVM> result = new();
+            var eo = eoResp.data;
+            var couponResp = await _couponRepository.Query(eo.FromPlatform, eo.Tid);
+            var ciResp = await _consumeInfoRepository.ConsumeInfoQuery(
+                $"{eo.TargetProxy.ToString()}_consume_info",
+                couponResp.data.Coupon
+            );
+
+            result.data = new TableItemVM(eo, couponResp.data, ciResp.data);
+            result.code = LuoliCommon.Enums.EResponseCode.Success;
+            return result;
         }
 
+        public class couponReq{
+            public string Coupon { get; set; }
+        }
+
+        [HttpPost]
+        [Route("coupon-invalidate")]
+        public async Task<ApiResponse<bool>> CouponInvalidate([FromBody] couponReq obj)
+        {
+            string coupon = obj.Coupon;
+            _logger.Info($"trigger AdminController.CouponInvalidate with coupon[{coupon}]");
+
+            return await _couponRepository.Invalidate(coupon);
+        }
 
     }
 }

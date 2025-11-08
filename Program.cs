@@ -2,6 +2,7 @@
 using GatewayService.MiddleWares;
 using GatewayService.User;
 using LuoliCommon;
+using LuoliCommon.Enums;
 using LuoliCommon.Logger;
 using LuoliHelper.Utils;
 using LuoliUtils;
