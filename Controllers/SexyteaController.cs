@@ -194,6 +194,14 @@ namespace GatewayService.Controllers
 
             try
             {
+                var couponExist = await RedisHelper.ExistsAsync(consumeInfo.Coupon);
+
+                if(!couponExist)
+                {
+                    response.data = false;
+                    response.msg = "你的卡密不存在，可能是超时了";
+                    return response;
+                }
                
                 await _channel.BasicPublishAsync(exchange: string.Empty,
                  routingKey: Program.Config.KVPairs["StartWith"] + RabbitMQKeys.ConsumeInfoInserting,
