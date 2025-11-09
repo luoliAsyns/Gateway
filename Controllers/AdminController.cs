@@ -162,54 +162,63 @@ namespace GatewayService.Controllers
                         name = "拉取订单",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedOrders),
                         color = "green",
+                        metric="order_pulled_total",
                     },
                     new
                     {
                         name = "收到退款请求",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedRefund),
                         color = "pink-darken-2",
+                         metric="refund_requests_total",
                     },
                     new
                     {
                         name = "生成卡密",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_CouponsGenerated) ,
                         color = "green",
+                         metric="coupons_generated_total",
                     },
                     new
                     {
                         name = "发货成功",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_Shipped) ,
                         color = "green",
+                         metric="shipped_success_total",
                     },
                     new
                     {
                         name = "发货失败",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ShipFailed) ,
                         color = "pink-darken-2",
+                         metric="shipped_failed_total",
                     },
                     new
                     {
                         name = "收到消费信息",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedConsumeInfo) ,
                         color = "green",
+                         metric="consume_info_received_total",
                     },
                     new
                     {
                         name = "插入消费信息",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_InsertedConsumeInfo) ,
                         color = "green",
+                         metric="consume_info_inserted_total",
                     },
                     new
                     {
                         name = "代理下单成功",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrders) ,
                         color = "green",
+                         metric="agent_orders_success_total",
                     },
                     new
                     {
                         name = "代理下单失败",
                         value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrdersFailed) ,
                         color = "pink-darken-2",
+                        metric="agent_orders_failed_total",
                     }
                 };
 

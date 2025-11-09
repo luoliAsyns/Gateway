@@ -20,7 +20,6 @@ using ILogger = LuoliCommon.Logger.ILogger;
 namespace GatewayService.Controllers
 {
 
-    [Time]
     public class SexyteaController : Controller
     {
         private readonly IExternalOrderRepository _externalOrderRepository;
@@ -56,6 +55,7 @@ namespace GatewayService.Controllers
 
         #region  对外公共api
         [HttpGet]
+        [Time]
         [Route("api/gateway/prod/sexytea/city")]
         public async Task<ApiResponse<string>> GetCity([FromQuery] int branchId)
         {
@@ -65,7 +65,7 @@ namespace GatewayService.Controllers
 
             ApiResponse<Dictionary<int, string>> response = new();
 
-            var city = RedisHelper.HGet(RedisKeys.BranchId2City, branchId.ToString());
+            var city = await RedisHelper.HGetAsync(RedisKeys.BranchId2City, branchId.ToString());
 
             _logger.Info($"[{requestId}] return city:[{city}] ");
 
@@ -78,6 +78,7 @@ namespace GatewayService.Controllers
         }
 
         [HttpPost]
+        [Time]
         [Route("api/gateway/prod/sexytea/token")]
         public async Task<ApiResponse<string>> RefreshToken([FromBody] NotifyRequest request)
         {
@@ -183,6 +184,7 @@ namespace GatewayService.Controllers
 
 
         [HttpPost]
+        [Time]
         [Route("api/gateway/prod/sexytea/consume")]
         public async Task<ApiResponse<bool>> Consume([FromBody] ConsumeInfoDTO consumeInfo)
         {
@@ -232,6 +234,7 @@ namespace GatewayService.Controllers
 
 
         [HttpGet]
+        [Time]
         [Route("api/gateway/prod/sexytea/order")]
         public async Task<ApiResponse<dynamic>> GetOrder([FromQuery] string coupon)
         {
@@ -287,6 +290,7 @@ namespace GatewayService.Controllers
         }
 
         [HttpPost]
+        [Time]
         [Route("api/gateway/admin/sexytea/refund")]
         public async Task<ApiResponse<bool>> Refund([FromBody] sexyteaRefundReq req)
         {
@@ -332,6 +336,7 @@ namespace GatewayService.Controllers
 
 
         [HttpGet]
+        [Time]
         [Route("api/gateway/admin/sexytea/user-info")]
         public async Task<ApiResponse<dynamic>> GetUserInfo()
         {
@@ -360,7 +365,7 @@ namespace GatewayService.Controllers
                 response.msg = string.Empty;
                 response.code = EResponseCode.Success;
 
-                _logger.Info($"SexyteaController.GetUserInfo, [{refundResult}]]");
+                _logger.Info($"SexyteaController.GetUserInfo success");
 
                 return response;
             }
@@ -377,6 +382,7 @@ namespace GatewayService.Controllers
 
 
         [HttpGet]
+        [Time]
         [Route("api/gateway/admin/sexytea/token")]
         public async Task<ApiResponse<Account>> GetToken()
         {
