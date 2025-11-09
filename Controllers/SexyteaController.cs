@@ -204,7 +204,16 @@ namespace GatewayService.Controllers
                     response.msg = "你的卡密不存在，可能是超时了";
                     return response;
                 }
-               
+
+                var tokenExist = await RedisHelper.ExistsAsync(RedisKeys.SexyteaTokenAccount);
+
+                if (!tokenExist)
+                {
+                    response.data = false;
+                    response.msg = "当前后台账户已过期，请联系客服";
+                    return response;
+                }
+
                 await _channel.BasicPublishAsync(exchange: string.Empty,
                  routingKey: Program.Config.KVPairs["StartWith"] + RabbitMQKeys.ConsumeInfoInserting,
                  true,
