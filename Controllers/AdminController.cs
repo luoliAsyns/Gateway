@@ -1,9 +1,12 @@
 ﻿using GatewayService.MiddleWares;
 using GatewayService.User;
 using LuoliCommon.DTO;
+using LuoliCommon.DTO.Admin;
+using LuoliCommon.DTO.ConsumeInfo.Sexytea;
 using LuoliCommon.DTO.ExternalOrder;
 using LuoliCommon.DTO.User;
 using LuoliCommon.Entities;
+using LuoliCommon.Enums;
 using LuoliUtils;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +14,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Polly;
 using System.Drawing;
 using System.Linq;
+using ThirdApis;
 using ThirdApis.Services.ConsumeInfo;
 using ThirdApis.Services.Coupon;
 using ThirdApis.Services.ExternalOrder;
@@ -155,47 +159,56 @@ namespace GatewayService.Controllers
                     new
                     {
                         name = "拉取订单",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedOrders)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedOrders),
+                        color = "green",
                     },
                     new
                     {
                         name = "收到退款请求",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedRefund)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedRefund),
+                        color = "pink-darken-2",
                     },
                     new
                     {
                         name = "生成卡密",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_CouponsGenerated)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_CouponsGenerated) ,
+                        color = "green",
                     },
                     new
                     {
                         name = "发货成功",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_Shipped)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_Shipped) ,
+                        color = "green",
                     },
                     new
                     {
                         name = "发货失败",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ShipFailed)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ShipFailed) ,
+                        color = "pink-darken-2",
                     },
                     new
                     {
                         name = "收到消费信息",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedConsumeInfo)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_ReceivedConsumeInfo) ,
+                        color = "green",
                     },
                     new
                     {
                         name = "插入消费信息",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_InsertedConsumeInfo)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_InsertedConsumeInfo) ,
+                        color = "green",
                     },
                     new
                     {
                         name = "代理下单成功",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrders)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrders) ,
+                        color = "green",
                     },
                     new
                     {
                         name = "代理下单失败",
-                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrdersFailed)
+                        value = await RedisHelper.GetAsync<int>(RedisKeys.Prom_PlacedOrdersFailed) ,
+                        color = "pink-darken-2",
                     }
                 };
 
@@ -272,19 +285,130 @@ namespace GatewayService.Controllers
             return result;
         }
 
-        public class couponReq{
-            public string Coupon { get; set; }
-        }
+       
 
         [HttpPost]
         [Route("coupon-invalidate")]
-        public async Task<ApiResponse<bool>> CouponInvalidate([FromBody] couponReq obj)
+        public async Task<ApiResponse<bool>> CouponInvalidate([FromBody] InvalidateCouponRequest obj)
         {
             string coupon = obj.Coupon;
             _logger.Info($"trigger AdminController.CouponInvalidate with coupon[{coupon}]");
 
             return await _couponRepository.Invalidate(coupon);
         }
+
+
+
+
+        [HttpGet]
+        [Route("sku-map")]
+        public async Task<ApiResponse<dynamic>> GetSkuIdMap()
+        {
+
+            _logger.Info($"trigger SexyteaController.GetSkuIdMap");
+
+            ApiResponse<dynamic> response = new ApiResponse<dynamic>();
+            response.code = EResponseCode.Fail;
+            response.data =  null;
+
+            try
+            {
+                var map = await RedisHelper.HGetAllAsync("skuid2proxy");
+                response.data = new
+                {
+                    map = map,
+                    allOptions = map.Values.Distinct()
+                };
+                response.msg = string.Empty;
+                response.code = EResponseCode.Success;
+
+                _logger.Info($"SexyteaController.GetSkuIdMap, length[{map?.Count}]]");
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.GetSkuIdMap ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = null;
+                return response;
+            }
+        }
+
+
+        [HttpPost]
+        [Route("sku-map-item-update")]
+        public async Task<ApiResponse<bool>> UpdateSkuIdMapItem([FromBody] SkuIdMapChangeRequest req)
+        {
+
+            _logger.Info($"trigger SexyteaController.UpdateSkuIdMapItem skuid[{req.skuId}] newValue[{req.targetProxy}]");
+
+
+            ApiResponse<bool> response = new ApiResponse<bool>();
+            response.code = EResponseCode.Fail;
+            response.data = false;
+
+            try
+            {
+                var result = await RedisHelper.HSetAsync("skuid2proxy", req.skuId , req.targetProxy);
+                response.data = result;
+                response.msg = string.Empty;
+                response.code = EResponseCode.Success;
+
+                _logger.Info($"SexyteaController.UpdateSkuIdMapItem, result[{result}]");
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.UpdateSkuIdMapItem ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = false;
+                return response;
+            }
+        }
+
+
+        [HttpPost]
+        [Route("sku-map-item-delete")]
+        public async Task<ApiResponse<bool>> DeleteSkuIdMapItem([FromBody] SkuIdMapChangeRequest req)
+        {
+
+            _logger.Info($"trigger SexyteaController.DeleteSkuIdMapItem skuid[{req.skuId}] ");
+
+
+            ApiResponse<bool> response = new ApiResponse<bool>();
+            response.code = EResponseCode.Fail;
+            response.data = false;
+
+            try
+            {
+                var result = await RedisHelper.HDelAsync("skuid2proxy", req.skuId);
+                response.data = true;
+                response.msg = string.Empty;
+                response.code = EResponseCode.Success;
+
+                _logger.Info($"SexyteaController.DeleteSkuIdMapItem success");
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.DeleteSkuIdMapItem ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = false;
+                return response;
+            }
+        }
+
+        
+
 
     }
 }

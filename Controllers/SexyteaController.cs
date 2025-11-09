@@ -21,7 +21,6 @@ namespace GatewayService.Controllers
 {
 
     [Time]
-    [Route("api/gateway/prod/sexytea")]
     public class SexyteaController : Controller
     {
         private readonly IExternalOrderRepository _externalOrderRepository;
@@ -52,8 +51,12 @@ namespace GatewayService.Controllers
         private static BasicProperties _rabbitMQMsgProps = new BasicProperties();
 
 
+
+      
+
+        #region  对外公共api
         [HttpGet]
-        [Route("city")]
+        [Route("api/gateway/prod/sexytea/city")]
         public async Task<ApiResponse<string>> GetCity([FromQuery] int branchId)
         {
             string requestId = HttpContext.TraceIdentifier;
@@ -75,7 +78,7 @@ namespace GatewayService.Controllers
         }
 
         [HttpPost]
-        [Route("token")]
+        [Route("api/gateway/prod/sexytea/token")]
         public async Task<ApiResponse<string>> RefreshToken([FromBody] NotifyRequest request)
         {
             // e.g.
@@ -95,7 +98,7 @@ namespace GatewayService.Controllers
             _logger.Info("passed parse response from fiddler");
             ApiCaller.NotifyAsync("sexytea token refreshed");
 
-            RedisHelper.SetAsync("sexytea.token", commonToken, 5 * 3600);
+            RedisHelper.SetAsync("sexytea.token", commonToken, 6 * 3600);
 
             response.msg = "success";
             response.code = EResponseCode.Success;
@@ -180,7 +183,7 @@ namespace GatewayService.Controllers
 
 
         [HttpPost]
-        [Route("consume")]
+        [Route("api/gateway/prod/sexytea/consume")]
         public async Task<ApiResponse<bool>> Consume([FromBody] ConsumeInfoDTO consumeInfo)
         {
             _logger.Info($"trigger SexyteaController.Consume with [{JsonSerializer.Serialize(consumeInfo)}] ");
@@ -221,7 +224,7 @@ namespace GatewayService.Controllers
 
 
         [HttpGet]
-        [Route("order")]
+        [Route("api/gateway/prod/sexytea/order")]
         public async Task<ApiResponse<dynamic>> GetOrder([FromQuery] string coupon)
         {
 
@@ -265,6 +268,10 @@ namespace GatewayService.Controllers
             return response;
         }
 
+        #endregion
+
+
+        #region  对内admin api  需要token或者是局域网
 
         public class sexyteaRefundReq
         {
@@ -272,7 +279,7 @@ namespace GatewayService.Controllers
         }
 
         [HttpPost]
-        [Route("refund")]
+        [Route("api/gateway/admin/sexytea/refund")]
         public async Task<ApiResponse<bool>> Refund([FromBody] sexyteaRefundReq req)
         {
             string orderNo = req.OrderNo;
@@ -314,5 +321,99 @@ namespace GatewayService.Controllers
                 return response;
             }
         }
+
+
+        [HttpGet]
+        [Route("api/gateway/admin/sexytea/user-info")]
+        public async Task<ApiResponse<dynamic>> GetUserInfo()
+        {
+
+            _logger.Info($"trigger SexyteaController.GetUserInfo");
+
+            ApiResponse<dynamic> response = new ApiResponse<dynamic>();
+            response.code = EResponseCode.Fail;
+            response.data = null;
+
+            try
+            {
+                var account = await RedisHelper.GetAsync<Account>("sexytea.token");
+
+                if (account is null)
+                {
+                    response.code = EResponseCode.Fail;
+                    response.msg = "Sexytea token expired";
+                    response.data = null;
+                    return response;
+                }
+
+                var refundResult = await _sexyteaApis.UserInfo(account);
+
+                response.data = refundResult;
+                response.msg = string.Empty;
+                response.code = EResponseCode.Success;
+
+                _logger.Info($"SexyteaController.GetUserInfo, [{refundResult}]]");
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.GetUserInfo ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = null;
+                return response;
+            }
+        }
+
+
+        [HttpGet]
+        [Route("api/gateway/admin/sexytea/token")]
+        public async Task<ApiResponse<Account>> GetToken()
+        {
+
+            _logger.Info($"trigger SexyteaController.GetToken");
+
+            ApiResponse<Account> response = new ApiResponse<Account>();
+            response.code = EResponseCode.Fail;
+            response.data = null;
+
+            try
+            {
+                var account = await RedisHelper.GetAsync<Account>("sexytea.token");
+
+                if (account is null)
+                {
+                    response.code = EResponseCode.Fail;
+                    response.msg = "Sexytea token expired";
+                    response.data = null;
+                    return response;
+                }
+
+
+                response.data = account;
+                response.msg = string.Empty;
+                response.code = EResponseCode.Success;
+
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.GetToken ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = null;
+                return response;
+            }
+        }
+
+
+
+
+        #endregion
+
     }
 }
