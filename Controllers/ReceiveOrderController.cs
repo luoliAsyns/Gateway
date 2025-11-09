@@ -131,9 +131,6 @@ namespace GatewayService.Controllers
 
             _logger.Info($"[{requestId}] trigger ReceiveOrderController.ReceiveExternalOrder, fromPlatform:[{orderCreateDto.FromPlatform}] tid: [{orderCreateDto.Tid}]");
 
-            if (await RedisHelper.SIsMemberAsync(RedisKeys.ReceivedExternalOrder, orderCreateDto.Tid))
-                return BadRequest("existed in redis already, should be duplicate");
-
 
             var accessToken = await RedisHelper.HGetAsync(RedisKeys.AgisoAccessToken, orderCreateDto.SellerNick);
 
@@ -158,6 +155,7 @@ namespace GatewayService.Controllers
                 return BadRequest(notFound);
             }
 
+            _logger.Info($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, get TradeInfo success");
             //System.IO.File.WriteAllText("4835278155226513614_TradeInfo", JsonSerializer.Serialize(tradeInfoDTO));
 
             try
