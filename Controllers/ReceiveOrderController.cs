@@ -134,8 +134,19 @@ namespace GatewayService.Controllers
             if (await RedisHelper.SIsMemberAsync(RedisKeys.ReceivedExternalOrder, orderCreateDto.Tid))
                 return BadRequest("existed in redis already, should be duplicate");
 
+
+            var accessToken = await RedisHelper.HGetAsync(RedisKeys.AgisoAccessToken, orderCreateDto.SellerNick);
+
+            if(accessToken is null)
+            {
+                string notFound = $"店铺id[{orderCreateDto.SellerNick}]没有找到对应的agiso access token";
+                Notify(orderCreateDto, notFound);
+                _logger.Error(notFound);
+                return BadRequest(notFound);
+            }
+
             //OrderCreateRequest 要转成 ExternalOrderDTO
-            var (tradeInfoSuccess, tradeInfoDTO) = await _agisoApis.TradeInfo(Program.Config.KVPairs["AgisoAccessToken"],
+            var (tradeInfoSuccess, tradeInfoDTO) = await _agisoApis.TradeInfo(accessToken,
                 Program.Config.KVPairs["AgisoAppSecret"],
                 orderCreateDto.Tid.ToString());
 
