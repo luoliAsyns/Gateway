@@ -362,6 +362,8 @@ namespace GatewayService.Controllers
             _logger.Info($"trigger AdminController.CouponRecover with coupon[{coupon}]");
 
             var couponDto = (await _couponRepository.Query(coupon)).data;
+            var eoDto = (await _externalOrderRepository.Get(couponDto.ExternalOrderFromPlatform, couponDto.ExternalOrderTid)).data;
+            await _externalOrderRepository.Update( new UpdateRequest() { EO= eoDto , Event= EEvent.Receive_Manual_Recover_Coupon});
 
             return await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest() {Coupon= couponDto, Event = EEvent.Receive_Manual_Recover_Coupon });
         }
