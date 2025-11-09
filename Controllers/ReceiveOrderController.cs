@@ -234,6 +234,8 @@ namespace GatewayService.Controllers
 
             try
             {
+                RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
+
                 var eoResp = await _externalOrderRepository.Get(orderRefundDto.Platform, orderRefundDto.Tid.ToString());
                 if(!eoResp.ok || (eoResp.data is null ))
                 {
@@ -264,7 +266,6 @@ namespace GatewayService.Controllers
                     _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
                     return BadRequest("update CouponDTO failed");
                 }
-                RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
                 return Ok("ok");
 
             }
