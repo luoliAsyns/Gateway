@@ -354,6 +354,18 @@ namespace GatewayService.Controllers
         }
 
 
+        [HttpPost]
+        [Route("coupon-recover")]
+        public async Task<ApiResponse<bool>> CouponRecover([FromBody] InvalidateCouponRequest obj)
+        {
+            string coupon = obj.Coupon;
+            _logger.Info($"trigger AdminController.CouponRecover with coupon[{coupon}]");
+
+            var couponDto = (await _couponRepository.Query(coupon)).data;
+
+            return await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest() {Coupon= couponDto, Event = EEvent.Receive_Manual_Recover_Coupon });
+        }
+
 
 
         [HttpGet]
