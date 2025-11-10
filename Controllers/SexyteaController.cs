@@ -220,7 +220,6 @@ namespace GatewayService.Controllers
                  _rabbitMQMsgProps,
                 Encoding.UTF8.GetBytes(JsonSerializer.Serialize(consumeInfo)));
 
-                System.IO.File.WriteAllText("consumeInfo", JsonSerializer.Serialize(consumeInfo));
 
                 response.data = true;
                 response.msg = "sent consumeInfo to MQ success";

@@ -148,6 +148,34 @@ namespace GatewayService.Controllers
         }
 
 
+        [HttpPost]
+        [Route("register")]
+        public async Task<ApiResponse<string>> Register([FromBody] LuoliCommon.DTO.User.ChangePasswordRequest chRequest)
+        {
+
+            string user = HttpContext.Items["User"].ToString();
+
+            _logger.Info($"trigger AdminController.Register: user from context[{user}], input user:[{chRequest.UserName}]");
+
+            ApiResponse<string> resp = new ApiResponse<string>();
+            resp.code = LuoliCommon.Enums.EResponseCode.Fail;
+            resp.data = string.Empty;
+
+            if (user != "luoli" )
+            {
+                resp.msg = "只有luoli可以注册新用户";
+                _logger.Error($"AdminController.Register failed: user from context[{user}], input user:[{chRequest.UserName}]");
+            }
+            RedisHelper.DelAsync($"admin.{user}");
+
+            resp = await _userRepository.Register(chRequest.UserName, "", true);
+
+            await  RedisHelper.DelAsync($"admin.{user}");
+            _logger.Info($"AdminController.Register success, remove token in redis: user[{user}]");
+            return resp;
+        }
+
+
         [HttpGet]
         [Route("prom")]
         public async Task<ApiResponse<dynamic>> GetPrometheusData()
