@@ -388,7 +388,7 @@ namespace GatewayService.Controllers
                 response.data = new
                 {
                     map = map,
-                    allOptions = map.Values.Distinct()
+                    allOptions = map.Values.Select(item=>item.TargetProxy).Distinct()
                 };
                 response.msg = string.Empty;
                 response.code = EResponseCode.Success;
