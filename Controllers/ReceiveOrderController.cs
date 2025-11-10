@@ -1,4 +1,5 @@
 ﻿using LuoliCommon;
+using LuoliCommon.DTO.Admin;
 using LuoliCommon.DTO.Agiso;
 using LuoliCommon.DTO.ConsumeInfo;
 using LuoliCommon.DTO.Coupon;
@@ -163,11 +164,17 @@ namespace GatewayService.Controllers
                 var dto = tradeInfoDTO.ToExternalOrderDTO(
                     (order) =>
                     {
-                        string targetProxy = RedisHelper.HGet(RedisKeys.SkuId2Proxy, order.SkuId);
+                        try
+                        {
+                            SkuIdMapItem item = RedisHelper.HGet<SkuIdMapItem>(RedisKeys.SkuId2Proxy, order.SkuId);
+                            return item;
+                        }
+                        catch
+                        {
 
-                        if (!EnumHandler.TryParseIgnoringCaseAndSpaces(targetProxy, out ETargetProxy eTargetProxy))
-                            return ETargetProxy.Default;
-                        return eTargetProxy;
+                        }
+                        return null;
+                        
                     });
 
                 _logger.Info($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, convert to ExternalOrderDTO success");

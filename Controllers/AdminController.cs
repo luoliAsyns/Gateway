@@ -15,6 +15,7 @@ using Polly;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using ThirdApis;
 using ThirdApis.Services.ConsumeInfo;
 using ThirdApis.Services.Coupon;
@@ -383,7 +384,7 @@ namespace GatewayService.Controllers
 
             try
             {
-                var map = await RedisHelper.HGetAllAsync("skuid2proxy");
+                Dictionary<string, SkuIdMapItem> map = await RedisHelper.HGetAllAsync<SkuIdMapItem>("skuid2proxy");
                 response.data = new
                 {
                     map = map,
@@ -413,7 +414,7 @@ namespace GatewayService.Controllers
         public async Task<ApiResponse<bool>> UpdateSkuIdMapItem([FromBody] SkuIdMapChangeRequest req)
         {
 
-            _logger.Info($"trigger SexyteaController.UpdateSkuIdMapItem skuid[{req.skuId}] newValue[{req.targetProxy}]");
+            _logger.Info($"trigger SexyteaController.UpdateSkuIdMapItem skuid[{req.skuId}] newValue[{JsonSerializer.Serialize(req.item)}]");
 
 
             ApiResponse<bool> response = new ApiResponse<bool>();
@@ -422,7 +423,7 @@ namespace GatewayService.Controllers
 
             try
             {
-                var result = await RedisHelper.HSetAsync("skuid2proxy", req.skuId , req.targetProxy);
+                var result = await RedisHelper.HSetAsync("skuid2proxy", req.skuId , req.item);
                 response.data = result;
                 response.msg = string.Empty;
                 response.code = EResponseCode.Success;
