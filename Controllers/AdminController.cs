@@ -8,6 +8,7 @@ using LuoliCommon.DTO.User;
 using LuoliCommon.Entities;
 using LuoliCommon.Enums;
 using LuoliUtils;
+using MethodTimer;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -166,12 +167,11 @@ namespace GatewayService.Controllers
                 resp.msg = "只有luoli可以注册新用户";
                 _logger.Error($"AdminController.Register failed: user from context[{user}], input user:[{chRequest.UserName}]");
             }
-            RedisHelper.DelAsync($"admin.{user}");
+            await RedisHelper.DelAsync($"admin.{chRequest.UserName}");
 
             resp = await _userRepository.Register(chRequest.UserName, "", true);
 
-            await  RedisHelper.DelAsync($"admin.{user}");
-            _logger.Info($"AdminController.Register success, remove token in redis: user[{user}]");
+            _logger.Info($"AdminController.Register success, remove token in redis: user[{chRequest.UserName}]");
             return resp;
         }
 
@@ -255,6 +255,46 @@ namespace GatewayService.Controllers
         }
 
 
+        [HttpGet]
+        [Time]
+        [Route("~/api/gateway/prod/place-order-button-enable")]
+        public async Task<ApiResponse<dynamic>> GetPlaceOrderButtonEnable([FromQuery] string targetProxy=null)
+        {
+            var resp = new ApiResponse<dynamic>();
+            resp.code = EResponseCode.Success;
+            resp.msg = string.Empty;
+            if(targetProxy is null)
+                resp.data = await RedisHelper.HGetAllAsync<bool>(RedisKeys.PlaceOrderButtonEnable);
+            else
+                resp.data = await RedisHelper.HGetAsync<bool>(RedisKeys.PlaceOrderButtonEnable, targetProxy);
+
+            return resp;
+        }
+
+        [HttpPost]
+        [Time]
+        [Route("place-order-button-enable")]
+        public async Task<ApiResponse<bool>> SetPlaceOrderButtonEnable([FromQuery] string targetProxy, [FromQuery] bool enable)
+        {
+            var resp = new ApiResponse<bool>();
+            resp.code = EResponseCode.Success;
+
+            var current = await RedisHelper.HSetAsync(RedisKeys.PlaceOrderButtonEnable, targetProxy, enable);
+
+            if (enable)
+            {
+                resp.msg = $"当前{targetProxy}可以下单";
+                resp.data = true;
+            }
+            else
+            {
+                resp.msg = $"当前{targetProxy}已被禁止下单";
+                resp.data = false;
+
+            }
+
+            return resp;
+        }
 
         // 定义 Redis 指标与 Prometheus 指标的映射关系
         private readonly Dictionary<string, (string PromName, string Help, string Type)> _metricMappings = new()

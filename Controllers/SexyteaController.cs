@@ -65,7 +65,7 @@ namespace GatewayService.Controllers
 
             ApiResponse<Dictionary<int, string>> response = new();
 
-            var city = await RedisHelper.HGetAsync(RedisKeys.BranchId2City, branchId.ToString());
+            var city = await RedisHelper.HGetAsync(RedisKeys.SexyteaBranchId2City, branchId.ToString());
 
             _logger.Info($"[{requestId}] return city:[{city}] ");
 
@@ -76,6 +76,9 @@ namespace GatewayService.Controllers
                 data = city
             };
         }
+
+       
+
 
         [HttpPost]
         [Time]
@@ -97,7 +100,7 @@ namespace GatewayService.Controllers
                 return response;
             }
             _logger.Info("passed parse response from fiddler");
-            ApiCaller.NotifyAsync("sexytea token refreshed");
+            ApiCaller.NotifyAsync($"sexytea token refreshed {commonToken.phone}");
 
             RedisHelper.SetAsync("sexytea.token", commonToken, 6 * 3600);
 
@@ -123,6 +126,7 @@ namespace GatewayService.Controllers
                 commonToken.status = user.GetProperty("status").GetString();
                 commonToken.openId = user.GetProperty("openId").GetString();
                 commonToken.unionId = user.GetProperty("unionId").GetString();
+                commonToken.phone = user.GetProperty("fMobile").GetString();
             }
             catch (Exception ex)
             {
