@@ -111,6 +111,39 @@ namespace GatewayService.Controllers
             return response;
         }
 
+        [HttpGet]
+        [Time]
+        [Route("api/gateway/prod/sexytea/refresh-region-branch-map")]
+        public async Task<ApiResponse<bool>> RefreshRegionBranchMap()
+        {
+            _logger.Info("trigger SexyteaController.RefreshRegionBranchMap");
+
+          
+            ApiResponse<bool> response = new ApiResponse<bool>();
+
+
+            var cities = await  _sexyteaApis.GetRegions();
+            _logger.Info($"SexyteaController.RefreshRegionBranchMap found [{cities.Count}] cities");
+            int branchesCount = 0;
+            foreach(var city in cities)
+            {
+                var branches = await _sexyteaApis.GetBranchIdsInRegion(city);
+                branchesCount+= branches.Count;
+                _logger.Info($"SexyteaController.RefreshRegionBranchMap found [{branches.Count}] branches in city[{city}]");
+                foreach(var branch in branches)
+                    RedisHelper.HSetAsync(RedisKeys.SexyteaBranchId2City, branch.ToString(), city);
+            }   
+
+
+            response.msg = $"success, cities:[{cities.Count}], branches:[{branchesCount}]";
+            response.code = EResponseCode.Success;
+            response.data = true;
+
+            return response;
+        }
+
+
+
         private (bool, string, Token) validate(string content)
         {
             Token commonToken = new Token();
