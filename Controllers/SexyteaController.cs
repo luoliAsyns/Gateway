@@ -96,7 +96,8 @@ namespace GatewayService.Controllers
             if (!valid)
             {
                 response.msg = errorMsg;
-                response.code = EResponseCode.Fail;
+                response.code= EResponseCode.Fail;
+                _logger.Error(errorMsg);
                 return response;
             }
             _logger.Info("passed parse response from fiddler");
@@ -176,11 +177,11 @@ namespace GatewayService.Controllers
                 return result;
             }
 
-            if (commonToken.status != "NORMAL")
-            {
-                result.Item2 = $"status [{commonToken.status}] is not NORMAL";
-                return result;
-            }
+            //if (commonToken.status != "NORMAL")
+            //{
+            //    result.Item2 = $"status [{commonToken.status}] is not NORMAL";
+            //    return result;
+            //}
 
             var tokenSplits = commonToken.token.Split(".");
             if (tokenSplits.Length != 3)
