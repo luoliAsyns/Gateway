@@ -54,6 +54,48 @@ namespace GatewayService.Controllers
         }
 
 
+        [HttpGet]
+        [Time]
+        [Route("~/api/gateway/prod/place-order-button-enable")]
+        public async Task<ApiResponse<dynamic>> GetPlaceOrderButtonEnable([FromQuery] string targetProxy = null)
+        {
+            var resp = new ApiResponse<dynamic>();
+            resp.code = EResponseCode.Success;
+            resp.msg = string.Empty;
+            if (targetProxy is null)
+                resp.data = await RedisHelper.HGetAllAsync<bool>(RedisKeys.PlaceOrderButtonEnable);
+            else
+                resp.data = await RedisHelper.HGetAsync<bool>(RedisKeys.PlaceOrderButtonEnable, targetProxy);
+
+            return resp;
+        }
+
+        [HttpGet]
+        [Time]
+        [Route("~/api/gateway/prod/banned-branches")]
+        public async Task<ApiResponse<dynamic>> GetBannedBranchs([FromQuery] string targetProxy = null)
+        {
+            var resp = new ApiResponse<dynamic>();
+            resp.code = EResponseCode.Success;
+            resp.msg = string.Empty;
+            switch(targetProxy)
+            {
+                case "sexytea":
+                    resp.data = await RedisHelper.SMembersAsync(RedisKeys.SexyteaBannedBranchId);
+                    break;
+                default:
+                    resp.data = null;
+                    break;
+            }
+          
+            return resp;
+        }
+
+
+
+
+
+
         [HttpPost]
         [Route("login")]
         public async Task<ApiResponse<dynamic>> Login([FromBody] LuoliCommon.DTO.User.LoginRequest loginRequest)
@@ -255,21 +297,6 @@ namespace GatewayService.Controllers
         }
 
 
-        [HttpGet]
-        [Time]
-        [Route("~/api/gateway/prod/place-order-button-enable")]
-        public async Task<ApiResponse<dynamic>> GetPlaceOrderButtonEnable([FromQuery] string targetProxy=null)
-        {
-            var resp = new ApiResponse<dynamic>();
-            resp.code = EResponseCode.Success;
-            resp.msg = string.Empty;
-            if(targetProxy is null)
-                resp.data = await RedisHelper.HGetAllAsync<bool>(RedisKeys.PlaceOrderButtonEnable);
-            else
-                resp.data = await RedisHelper.HGetAsync<bool>(RedisKeys.PlaceOrderButtonEnable, targetProxy);
-
-            return resp;
-        }
 
         [HttpPost]
         [Time]
@@ -292,6 +319,34 @@ namespace GatewayService.Controllers
                 resp.data = false;
 
             }
+
+            return resp;
+        }
+
+        [HttpPost]
+        [Time]
+        [Route("banned-branches")]
+        public async Task<ApiResponse<bool>> SetBannedBranchs([FromBody] BannedBranchesRequest req)
+        {
+            var resp = new ApiResponse<bool>();
+            resp.code = EResponseCode.Success;
+
+            switch (req.targetProxy)
+            {
+                case "sexytea":
+                    await RedisHelper.DelAsync(RedisKeys.SexyteaBannedBranchId);
+                    foreach(var branch in req.branches)
+                        RedisHelper.SAddAsync(RedisKeys.SexyteaBannedBranchId, branch);
+
+                    resp.data = true;
+                    break;
+                default:
+                    resp.data = false;
+                    resp.msg = "未知代理名，没找到相关的禁止下单店铺";
+                    _logger.Warn(resp.msg);
+                    break;
+            }
+
 
             return resp;
         }

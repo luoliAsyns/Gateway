@@ -252,6 +252,20 @@ namespace GatewayService.Controllers
                     return response;
                 }
 
+                int branchId = ((SexyteaGoods)consumeInfo.Goods).BranchId;
+                bool isBannedBranch = await RedisHelper.SIsMemberAsync(RedisKeys.SexyteaBannedBranchId, branchId.ToString());
+                if (isBannedBranch)
+                {
+                    response.data = false;
+                    response.msg = "当前门店已被封禁，无法消费，请联系客服";
+                    string msg = $"前端已经禁止了的店铺[{branchId}]，依旧发送到了后端，考虑有人搞";
+                    _logger.Error(msg);
+                    ApiCaller.NotifyAsync(msg);
+                    return response;
+                }
+
+
+
                 await _channel.BasicPublishAsync(exchange: string.Empty,
                  routingKey: Program.Config.KVPairs["StartWith"] + RabbitMQKeys.ConsumeInfoInserting,
                  true,
