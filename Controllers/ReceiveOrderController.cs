@@ -147,7 +147,7 @@ namespace GatewayService.Controllers
             var (tradeInfoSuccess, tradeInfoDTO) = await _agisoApis.TradeInfo(accessToken,
                 Program.Config.KVPairs["AgisoAppSecret"],
                 orderCreateDto.Tid.ToString());
-
+            
             if (!tradeInfoSuccess)
             {
                 string notFound = "not found related order in Agiso";
@@ -155,6 +155,10 @@ namespace GatewayService.Controllers
                 _logger.Error(notFound);
                 return BadRequest(notFound);
             }
+
+            _logger.Info($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, override TradeInfo status[{tradeInfoDTO.Data.Status}] from [{orderCreateDto.Status}]");
+
+            tradeInfoDTO.Data.Status = orderCreateDto.Status; //用最新的状态覆盖
 
             _logger.Info($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, get TradeInfo success");
             //System.IO.File.WriteAllText("4835278155226513614_TradeInfo", JsonSerializer.Serialize(tradeInfoDTO));
