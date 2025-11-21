@@ -22,6 +22,10 @@ namespace GatewayService.Controllers
 
     public class SexyteaController : Controller
     {
+        private static JsonSerializerOptions _options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true, // 关键配置：忽略大小写
+        };
         private readonly IExternalOrderRepository _externalOrderRepository;
         private readonly ICouponRepository _couponRepository;
         private readonly IConsumeInfoRepository _consumeInfoRepository;
@@ -236,7 +240,7 @@ namespace GatewayService.Controllers
             {
                 var couponExist = await RedisHelper.ExistsAsync(consumeInfo.Coupon);
 
-                if(!couponExist)
+                if (!couponExist)
                 {
                     response.data = false;
                     response.msg = "你的卡密不存在，可能是超时了";
@@ -252,7 +256,7 @@ namespace GatewayService.Controllers
                     return response;
                 }
 
-                int branchId = ((SexyteaGoods)consumeInfo.Goods).BranchId;
+                int branchId = JsonSerializer.Deserialize<SexyteaGoods> (consumeInfo.Goods.ToString(), _options).BranchId;
                 bool isBannedBranch = await RedisHelper.SIsMemberAsync(RedisKeys.SexyteaBannedBranchId, branchId.ToString());
                 if (isBannedBranch)
                 {

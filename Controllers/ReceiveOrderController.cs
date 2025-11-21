@@ -181,6 +181,13 @@ namespace GatewayService.Controllers
                         
                     });
 
+
+                if(dto is null)
+                {
+                    _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, convert to ExternalOrderDTO failed, skuid[{tradeInfoDTO.Data.Orders.First().SkuId}]");
+                    return Ok($"可能是其他sku[{tradeInfoDTO.Data.Orders.First().SkuId}]");
+                }
+
                 _logger.Info($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, convert to ExternalOrderDTO success");
 
 
