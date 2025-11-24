@@ -174,12 +174,12 @@ namespace GatewayService.MiddleWares
         /// </summary>
         public string GenerateToken(string username)
         {
-            // 令牌过期时间 60分钟
+            // 令牌过期时间 18*60分钟
 
             var token = JwtBuilder.Create()
                       .WithAlgorithm(new HMACSHA256Algorithm())
                       .WithSecret(SecretKey) // 传入密钥
-                      .AddClaim("exp", DateTimeOffset.UtcNow.AddMinutes(60).ToUnixTimeSeconds())
+                      .AddClaim("exp", DateTimeOffset.UtcNow.AddMinutes(60 *18).ToUnixTimeSeconds())
                       .AddClaim("name", username)
                       .Encode();
 

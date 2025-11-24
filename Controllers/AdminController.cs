@@ -222,7 +222,7 @@ namespace GatewayService.Controllers
         [Route("prom")]
         public async Task<ApiResponse<dynamic>> GetPrometheusData()
         {
-            _logger.Info($"trigger AdminController.GetPrometheusData");
+            //_logger.Info($"trigger AdminController.GetPrometheusData");
 
             ApiResponse<dynamic> resp = new ApiResponse<dynamic>();
             resp.code = LuoliCommon.Enums.EResponseCode.Success;

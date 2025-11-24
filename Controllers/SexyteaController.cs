@@ -337,6 +337,28 @@ namespace GatewayService.Controllers
                 response.data = null;
                 return response;
             }
+
+            try
+            {
+                JsonDocument doc = JsonDocument.Parse(order.ToString());
+                decimal proxyPayment = doc.RootElement.GetProperty("data").GetProperty("balanceAmount").GetDecimal();
+                if (couponDto.data.ProxyPayment != proxyPayment)
+                {
+                    couponDto.data.ProxyPayment = proxyPayment;
+                    await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
+                    {
+                        Coupon = couponDto.data,
+                        Event = EEvent.ProxyQuery
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.GetOrder update proxyPayment ");
+                _logger.Error(ex.Message);
+            }
+
+
             response.code = EResponseCode.Success;
             response.msg = "success";
             response.data = order;
@@ -351,6 +373,7 @@ namespace GatewayService.Controllers
         public class sexyteaRefundReq
         {
             public string OrderNo { get; set; }
+            public string Coupon { get; set; }
         }
 
         [HttpPost]
@@ -383,7 +406,16 @@ namespace GatewayService.Controllers
                 response.msg = refundResult.Item2;
                 response.code = EResponseCode.Success;
 
-                _logger.Info($"SexyteaController.Refund, [{refundResult.Item1},[{refundResult.Item2}]]");
+                _logger.Info($"SexyteaController.Refund, [{refundResult.Item1},[{refundResult.Item2}]");
+                if(response.data)
+                {
+                    var couponRep = await _couponRepository.Query(req.Coupon);
+                    await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
+                    {
+                        Coupon = couponRep.data,
+                        Event = EEvent.ProxyRefund
+                    });
+                }
 
                 return response;
             }
