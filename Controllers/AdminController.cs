@@ -115,12 +115,12 @@ namespace GatewayService.Controllers
                 var token = _jwtService.GenerateToken(loginRequest.UserName);
 
                 // 3. 返回令牌和用户基本信息
-                RedisHelper.SetAsync($"admin.{loginRequest.UserName}", token, 60 * 60);
+                RedisHelper.SetAsync($"admin.{loginRequest.UserName}", token, 18* 60 * 60);
 
                 resp.data = new
                 {
                     Token = token,
-                    ExpiresIn = 3600,
+                    ExpiresIn = 3600 * 18,
                     User = loginRequest.UserName
                 };
                 resp.code = LuoliCommon.Enums.EResponseCode.Success;
