@@ -246,17 +246,14 @@ namespace GatewayService.Controllers
 
             _logger.Info($"[{requestId}] trigger ReceiveOrderController.ReceiveExternalOrder, fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
 
-          
-
             try
             {
-                RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
 
                 var eoResp = await _externalOrderRepository.Get(orderRefundDto.Platform, orderRefundDto.Tid.ToString());
                 if(!eoResp.ok || (eoResp.data is null ))
                 {
                     _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, not found related ExternalOrderDTO with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
-                    return BadRequest("not found ExternalOrderDTO");
+                    return Ok("not found ExternalOrderDTO, 可能是店里其他产品的退款");
                 }
               
                 var updateEOResp = await _externalOrderRepository.Update(new LuoliCommon.DTO.ExternalOrder.UpdateRequest()
@@ -282,6 +279,9 @@ namespace GatewayService.Controllers
                     _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
                     return BadRequest("update CouponDTO failed");
                 }
+
+                RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
+
                 return Ok("ok");
 
             }

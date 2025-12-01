@@ -208,6 +208,7 @@ namespace GatewayService.Controllers
             {
                 resp.msg = "只有luoli可以注册新用户";
                 _logger.Error($"AdminController.Register failed: user from context[{user}], input user:[{chRequest.UserName}]");
+                return resp;
             }
             await RedisHelper.DelAsync($"admin.{chRequest.UserName}");
 
