@@ -271,7 +271,7 @@ namespace GatewayService.Controllers
                 //coupon只能消费一次
                 //如果通过coupon查不到CI 说明是第一次消费
                 var existedCoupon = await _consumeInfoRepository.ConsumeInfoQuery(consumeInfo.GoodsType, consumeInfo.Coupon);
-                if (!(existedCoupon is null))
+                if (!(existedCoupon.data is null))
                 {
                     response.msg = "卡密已经使用过，请勿重复提交";
                     response.data = false;
