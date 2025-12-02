@@ -268,6 +268,12 @@ namespace GatewayService.Controllers
                     return BadRequest("update ExternalOrderDTO failed");
                 }
 
+
+                //如果已经消费了
+                //卡密更新会失败
+                //所以前移统计
+                RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
+
                 var updateCouponResp = await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
                 {
                     Coupon = await _couponRepository.Query(eoResp.data.FromPlatform, eoResp.data.Tid).ContinueWith(t => t.Result.data),
@@ -280,7 +286,6 @@ namespace GatewayService.Controllers
                     return BadRequest("update CouponDTO failed");
                 }
 
-                RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
 
                 return Ok("ok");
 
