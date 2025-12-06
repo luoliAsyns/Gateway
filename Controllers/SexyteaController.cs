@@ -340,7 +340,7 @@ namespace GatewayService.Controllers
 
             var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, couponDto.data.ProxyOpenId);
 
-            if(account is null)
+            if(account is null || account.Exp < DateTime.Now)
             {
                 response.code = EResponseCode.Fail;
                 response.msg = $"Sexytea token[{couponDto.data.ProxyOpenId}] expired";
@@ -413,10 +413,9 @@ namespace GatewayService.Controllers
             {
                 var couponRep = await _couponRepository.Query(req.Coupon);
 
-
                 var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, couponRep.data.ProxyOpenId);
 
-                if (account is null)
+                if (account is null || account.Exp < DateTime.Now)
                 {
                     response.code = EResponseCode.Fail;
                     response.msg = $"Sexytea token[{couponRep.data.ProxyOpenId}] expired";
@@ -469,6 +468,8 @@ namespace GatewayService.Controllers
             try
             {
                 var accounts = await RedisHelper.HGetAllAsync<Account>(RedisKeys.SexyteaTokenAccount);
+                var orderCounts = await RedisHelper.HGetAllAsync<int>(RedisKeys.SexyteaTokenPlaceOrdersCount);
+                _sexyteaTokenRecommend.MergeData(accounts, orderCounts);
 
                 if (accounts is null || accounts.Count ==0)
                 {
@@ -477,10 +478,10 @@ namespace GatewayService.Controllers
                     response.data = null;
                     return response;
                 }
+
                 var resp = new List<dynamic>();
                 foreach(var pair in accounts)
                     resp.Add(await _sexyteaApis.UserInfo(pair.Value));
-                
 
                 response.data = resp;
                 response.msg = string.Empty;
