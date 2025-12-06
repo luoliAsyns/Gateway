@@ -1,6 +1,7 @@
 ﻿
 using LuoliCommon.DTO.ConsumeInfo;
 using LuoliCommon.DTO.ConsumeInfo.Sexytea;
+using LuoliCommon.DTO.Coupon;
 using LuoliCommon.Entities;
 using LuoliCommon.Enums;
 using LuoliHelper.Entities;
@@ -8,6 +9,7 @@ using LuoliUtils;
 using MethodTimer;
 using Microsoft.AspNetCore.Mvc;
 using RabbitMQ.Client;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using ThirdApis;
@@ -33,13 +35,15 @@ namespace GatewayService.Controllers
         private readonly IChannel _channel;
         private readonly ILogger _logger;
         private readonly SexyteaApis _sexyteaApis;
-    
+
+        private readonly SexyteaAccRecommend _sexyteaTokenRecommend;
+
 
         public SexyteaController(
-            IExternalOrderRepository orderRepository, 
-            ICouponRepository couponService, 
-            IConsumeInfoRepository consumeInfoRepository, 
-           ILogger logger, IChannel channel, SexyteaApis sexyteaApis)
+            IExternalOrderRepository orderRepository,
+            ICouponRepository couponService,
+            IConsumeInfoRepository consumeInfoRepository,
+           ILogger logger, IChannel channel, SexyteaApis sexyteaApis, SexyteaAccRecommend sexyteaTokenRecommend)
         {
             _externalOrderRepository = orderRepository;
             _couponRepository = couponService;
@@ -47,6 +51,8 @@ namespace GatewayService.Controllers
             _channel = channel;
             _logger = logger;
             _sexyteaApis = sexyteaApis;
+
+            _sexyteaTokenRecommend = sexyteaTokenRecommend;
             _rabbitMQMsgProps.ContentType = "text/plain";
             _rabbitMQMsgProps.DeliveryMode = DeliveryModes.Persistent;
         }
@@ -107,7 +113,7 @@ namespace GatewayService.Controllers
             _logger.Info("passed parse response from fiddler");
             ApiCaller.NotifyAsync($"sexytea token refreshed {commonToken.phone}");
 
-            RedisHelper.SetAsync("sexytea.token", commonToken, 6 * 3600);
+            RedisHelper.HSetAsync(RedisKeys.SexyteaTokenAccount, commonToken.phone, commonToken);
 
             response.msg = "success";
             response.code = EResponseCode.Success;
@@ -247,12 +253,12 @@ namespace GatewayService.Controllers
                     return response;
                 }
 
-                var tokenExist = await RedisHelper.ExistsAsync(RedisKeys.SexyteaTokenAccount);
 
-                if (!tokenExist)
+                var accounts = await RedisHelper.HGetAllAsync<Account>(RedisKeys.SexyteaTokenAccount);
+                if(!_sexyteaTokenRecommend.ExistValidAcc(accounts))
                 {
                     response.data = false;
-                    response.msg = "当前后台账户已过期，请联系客服";
+                    response.msg = "当前所有后台账户都已过期，请联系客服";
                     return response;
                 }
 
@@ -261,7 +267,7 @@ namespace GatewayService.Controllers
                 if (isBannedBranch)
                 {
                     response.data = false;
-                    response.msg = "当前门店已被封禁，无法消费，请联系客服";
+                    response.msg = "当前门店已被禁用，无法消费，请联系客服";
                     string msg = $"前端已经禁止了的店铺[{branchId}]，依旧发送到了后端，考虑有人搞";
                     _logger.Error(msg);
                     ApiCaller.NotifyAsync(msg);
@@ -328,12 +334,12 @@ namespace GatewayService.Controllers
             }
 
 
-            var account = await RedisHelper.GetAsync<Account>("sexytea.token");
+            var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, couponDto.data.ProxyOpenId);
 
             if(account is null)
             {
                 response.code = EResponseCode.Fail;
-                response.msg = "Sexytea token expired";
+                response.msg = $"Sexytea token[{couponDto.data.ProxyOpenId}] expired";
                 response.data = null;
                 return response;
             }
@@ -401,12 +407,15 @@ namespace GatewayService.Controllers
 
             try
             {
-                var account = await RedisHelper.GetAsync<Account>("sexytea.token");
+                var couponRep = await _couponRepository.Query(req.Coupon);
+
+
+                var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, couponRep.data.ProxyOpenId);
 
                 if (account is null)
                 {
                     response.code = EResponseCode.Fail;
-                    response.msg = "Sexytea token expired";
+                    response.msg = $"Sexytea token[{couponRep.data.ProxyOpenId}] expired";
                     response.data = false;
                     return response;
                 }
@@ -419,7 +428,7 @@ namespace GatewayService.Controllers
                 _logger.Info($"SexyteaController.Refund, [{refundResult.Item1},[{refundResult.Item2}]");
                 if(response.data)
                 {
-                    var couponRep = await _couponRepository.Query(req.Coupon);
+                   
                     await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
                     {
                         Coupon = couponRep.data,
@@ -455,19 +464,21 @@ namespace GatewayService.Controllers
 
             try
             {
-                var account = await RedisHelper.GetAsync<Account>("sexytea.token");
+                var accounts = await RedisHelper.HGetAllAsync<Account>(RedisKeys.SexyteaTokenAccount);
 
-                if (account is null)
+                if (accounts is null || accounts.Count ==0)
                 {
                     response.code = EResponseCode.Fail;
-                    response.msg = "Sexytea token expired";
+                    response.msg = "All Sexytea token expired";
                     response.data = null;
                     return response;
                 }
+                var resp = new List<dynamic>();
+                foreach(var pair in accounts)
+                    resp.Add(await _sexyteaApis.UserInfo(pair.Value));
+                
 
-                var refundResult = await _sexyteaApis.UserInfo(account);
-
-                response.data = refundResult;
+                response.data = resp;
                 response.msg = string.Empty;
                 response.code = EResponseCode.Success;
 
@@ -490,29 +501,28 @@ namespace GatewayService.Controllers
         [HttpGet]
         [Time]
         [Route("api/gateway/admin/sexytea/token")]
-        public async Task<ApiResponse<Account>> GetToken()
+        public async Task<ApiResponse<IEnumerable<Account>>> GetToken()
         {
 
             _logger.Info($"trigger SexyteaController.GetToken");
 
-            ApiResponse<Account> response = new ApiResponse<Account>();
+            ApiResponse<IEnumerable<Account>> response = new ();
             response.code = EResponseCode.Fail;
             response.data = null;
 
             try
             {
-                var account = await RedisHelper.GetAsync<Account>("sexytea.token");
+                var accounts = await RedisHelper.HGetAllAsync<Account>(RedisKeys.SexyteaTokenAccount);
 
-                if (account is null)
+                if (accounts is null || accounts.Count == 0)
                 {
                     response.code = EResponseCode.Fail;
-                    response.msg = "Sexytea token expired";
-                    response.data = null;
+                    response.msg = "All Sexytea token expired";
+                    response.data = Enumerable.Empty<Account>();
                     return response;
                 }
 
-
-                response.data = account;
+                response.data = accounts.Values;
                 response.msg = string.Empty;
                 response.code = EResponseCode.Success;
 

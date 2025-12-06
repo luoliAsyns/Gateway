@@ -110,6 +110,8 @@ namespace GatewayService
 
             builder.Services.AddScoped<IJwtService, JwtService>();
 
+            builder.Services.AddSingleton<SexyteaAccRecommend>();
+
             #region 注册 ILogger
 
             builder.Services.AddHttpClient("LokiHttpClient")
