@@ -255,7 +255,11 @@ namespace GatewayService.Controllers
 
 
                 var accounts = await RedisHelper.HGetAllAsync<Account>(RedisKeys.SexyteaTokenAccount);
-                if(!_sexyteaTokenRecommend.ExistValidAcc(accounts))
+                var orderCounts = await RedisHelper.HGetAllAsync<int>(RedisKeys.SexyteaTokenPlaceOrdersCount);
+                _sexyteaTokenRecommend.MergeData(accounts, orderCounts);
+              
+
+                if (!_sexyteaTokenRecommend.ExistValidAcc(accounts))
                 {
                     response.data = false;
                     response.msg = "当前所有后台账户都已过期，请联系客服";

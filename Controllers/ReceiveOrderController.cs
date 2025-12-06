@@ -283,7 +283,7 @@ namespace GatewayService.Controllers
                 if (!updateCouponResp.ok)
                 {
                     _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
-                    return BadRequest("update CouponDTO failed");
+                    return Ok("update CouponDTO failed 可能是已经消费过了");
                 }
 
 
