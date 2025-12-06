@@ -29,7 +29,10 @@ namespace GatewayService.MiddleWares
         public async Task InvokeAsync(HttpContext context)
         {
             // 获取客户端IP地址
-            var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var ipAddress = context.Request.Headers.TryGetValue("X-Forwarded-For", out var xff) ? xff.ToString().Split(',')[0].Trim() :
+                               context.Request.Headers.TryGetValue("X-Real-IP", out var xri) ? xri.ToString() :
+                               context.Connection.RemoteIpAddress?.ToString();
+
             var cacheKey = $"RateLimit_{ipAddress}";
 
             // 获取Redis数据库
