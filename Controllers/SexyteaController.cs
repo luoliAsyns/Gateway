@@ -111,10 +111,16 @@ namespace GatewayService.Controllers
                 return response;
             }
             _logger.Info("passed parse response from fiddler");
-            ApiCaller.NotifyAsync($"sexytea token refreshed {commonToken.phone}");
+            ApiCaller.NotifyAsync($"sexytea token refreshed {commonToken.Phone}");
 
-            RedisHelper.HSetAsync(RedisKeys.SexyteaTokenAccount, commonToken.phone, commonToken);
+            var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, commonToken.Phone);
+            if(!(account is null))
+            {
+                commonToken.TodayOrdersCount = account.TodayOrdersCount;
+                commonToken.Enable = account.Enable;
+            }
 
+            RedisHelper.HSetAsync(RedisKeys.SexyteaTokenAccount, commonToken.Phone, commonToken);
             response.msg = "success";
             response.code = EResponseCode.Success;
 
@@ -155,9 +161,9 @@ namespace GatewayService.Controllers
 
 
 
-        private (bool, string, Token) validate(string content)
+        private (bool, string, Account) validate(string content)
         {
-            Token commonToken = new Token();
+            Account commonToken = new Account();
             var result = (false, string.Empty, commonToken);
 
             try
@@ -165,12 +171,12 @@ namespace GatewayService.Controllers
                 dynamic obj = System.Text.Json.JsonSerializer.Deserialize<dynamic>(content);
                 dynamic user = obj.GetProperty("data").GetProperty("user");
 
-                commonToken.token = obj.GetProperty("data").GetProperty("token").GetString();
-                commonToken.code = obj.GetProperty("code").GetRawText();
-                commonToken.status = user.GetProperty("status").GetString();
-                commonToken.openId = user.GetProperty("openId").GetString();
-                commonToken.unionId = user.GetProperty("unionId").GetString();
-                commonToken.phone = user.GetProperty("fMobile").GetString();
+                commonToken.Token = obj.GetProperty("data").GetProperty("token").GetString();
+                commonToken.Code = obj.GetProperty("code").GetRawText();
+                commonToken.Status = user.GetProperty("status").GetString();
+                commonToken.OpenId = user.GetProperty("openId").GetString();
+                commonToken.UnionId = user.GetProperty("unionId").GetString();
+                commonToken.Phone = user.GetProperty("fMobile").GetString();
             }
             catch (Exception ex)
             {
@@ -181,22 +187,17 @@ namespace GatewayService.Controllers
                 return result;
             }
 
-            if (commonToken.code != "200")
+            if (commonToken.Code != "200")
             {
-                result.Item2 = $"code [{commonToken.code}] is not 200";
+                result.Item2 = $"code [{commonToken.Code}] is not 200";
                 return result;
             }
 
-            //if (commonToken.status != "NORMAL")
-            //{
-            //    result.Item2 = $"status [{commonToken.status}] is not NORMAL";
-            //    return result;
-            //}
 
-            var tokenSplits = commonToken.token.Split(".");
+            var tokenSplits = commonToken.Token.Split(".");
             if (tokenSplits.Length != 3)
             {
-                result.Item2 = $"token [{commonToken.token}] after split, length not 3";
+                result.Item2 = $"token [{commonToken.Token}] after split, length not 3";
                 return result;
             }
 
@@ -214,7 +215,7 @@ namespace GatewayService.Controllers
                 long iat = obj.GetProperty("iat").GetInt64();
                 long exp = obj.GetProperty("exp").GetInt64();
 
-                commonToken.exp = DateTimeOffset.FromUnixTimeSeconds(exp).DateTime.ToLocalTime();
+                commonToken.Exp = DateTimeOffset.FromUnixTimeSeconds(exp).DateTime.ToLocalTime();
 
                 return (true, string.Empty, commonToken);
             }
@@ -253,11 +254,7 @@ namespace GatewayService.Controllers
                     return response;
                 }
 
-
                 var accounts = await RedisHelper.HGetAllAsync<Account>(RedisKeys.SexyteaTokenAccount);
-                var orderCounts = await RedisHelper.HGetAllAsync<int>(RedisKeys.SexyteaTokenPlaceOrdersCount);
-                _sexyteaTokenRecommend.MergeData(accounts, orderCounts);
-              
 
                 if (!_sexyteaTokenRecommend.ExistValidAcc(accounts))
                 {

@@ -324,6 +324,37 @@ namespace GatewayService.Controllers
             return resp;
         }
 
+
+        [HttpPost]
+        [Time]
+        [Route("account-enable")]
+        public async Task<ApiResponse<bool>> SetAccountEnable([FromQuery] string targetProxy, [FromQuery] string phone, [FromQuery] bool enable)
+        {
+            var resp = new ApiResponse<bool>();
+            resp.code = EResponseCode.Success;
+
+            if (targetProxy == "sexytea")
+            {
+                var acc = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, phone);
+                acc.Enable = enable;
+                await RedisHelper.HSetAsync(RedisKeys.SexyteaTokenAccount, phone, acc);
+            }
+            else
+            {
+                resp.msg = $"{targetProxy} 暂不支持这个部分";
+                resp.data = false;
+                return resp;
+            }
+
+            resp.msg = $"当前[{targetProxy}].[{phone}]{(enable ? "" : "不")}可以下单";
+            resp.data = enable;
+
+            return resp;
+        }
+
+
+
+
         [HttpPost]
         [Time]
         [Route("banned-branches")]
