@@ -465,8 +465,6 @@ namespace GatewayService.Controllers
             try
             {
                 var accounts = await RedisHelper.HGetAllAsync<Account>(RedisKeys.SexyteaTokenAccount);
-                var orderCounts = await RedisHelper.HGetAllAsync<int>(RedisKeys.SexyteaTokenPlaceOrdersCount);
-                _sexyteaTokenRecommend.MergeData(accounts, orderCounts);
 
                 if (accounts is null || accounts.Count ==0)
                 {
