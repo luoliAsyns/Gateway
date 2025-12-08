@@ -438,6 +438,9 @@ namespace GatewayService.Controllers
         {
             _logger.Info($"trigger AdminController.GetPageOrders, page[{page}],size[{size}]");
 
+            startTime = startTime?.AddHours(-8);
+            startTime = endTime?.AddHours(-8);
+
             var couponResp = await _couponRepository.PageQuery(page, size, couponStatus, startTime, endTime );
 
 

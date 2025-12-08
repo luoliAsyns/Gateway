@@ -2,6 +2,7 @@
 using LuoliCommon.DTO.Admin;
 using LuoliCommon.DTO.Agiso;
 using LuoliCommon.DTO.ConsumeInfo;
+using LuoliCommon.DTO.ConsumeInfo.Sexytea;
 using LuoliCommon.DTO.Coupon;
 using LuoliCommon.DTO.ExternalOrder;
 using LuoliCommon.Entities;
@@ -40,12 +41,15 @@ namespace GatewayService.Controllers
         private readonly IChannel _channel;
         private readonly AgisoApis _agisoApis;
 
+        private readonly SexyteaApis _sexyteaApis;
+
         public ReceiveOrderController(
             IExternalOrderRepository orderRepository,
             ICouponRepository couponService, 
             IConsumeInfoRepository consumeInfoRepository,
             IChannel channel,
             AgisoApis agisoApis,
+            SexyteaApis sexyteaApis,
             ILogger logger)
         {
             _externalOrderRepository = orderRepository;
@@ -56,6 +60,7 @@ namespace GatewayService.Controllers
             _channel = channel;
 
             _agisoApis =agisoApis;
+            _sexyteaApis = sexyteaApis;
             _rabbitMQMsgProps.ContentType = "text/plain";
             _rabbitMQMsgProps.DeliveryMode = DeliveryModes.Persistent;
         }
@@ -302,11 +307,9 @@ namespace GatewayService.Controllers
                     {
                         _logger.Info($"sexytea coupon[{coupon.Coupon}] consumed, have a try to refund");
 
-                        await ApiCaller.PostAsync("https://huoshan.asynspetfood.top/api/gateway/admin/sexytea/refund", JsonSerializer.Serialize(new sexyteaRefundReq()
-                        {
-                            Coupon = coupon.Coupon,
-                            OrderNo = coupon.ProxyOrderId
-                        }));
+                        var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, coupon.ProxyOpenId);
+
+                        var refundResult = await _sexyteaApis.OrderRefund(account, coupon.ProxyOrderId);
 
                         return Ok("ok, 已经消费，触发后台退款流程");
                     }
