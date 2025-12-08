@@ -20,6 +20,7 @@ using ThirdApis.Services.ConsumeInfo;
 using ThirdApis.Services.Coupon;
 using ThirdApis.Services.ExternalOrder;
 using static CSRedis.CSRedisClient;
+using static GatewayService.Controllers.SexyteaController;
 using static Grpc.Core.Metadata;
 using ILogger = LuoliCommon.Logger.ILogger;
 
@@ -256,6 +257,8 @@ namespace GatewayService.Controllers
                     return Ok("not found ExternalOrderDTO, 可能是店里其他产品的退款");
                 }
               
+                
+
                 var updateEOResp = await _externalOrderRepository.Update(new LuoliCommon.DTO.ExternalOrder.UpdateRequest()
                 {
                      EO = eoResp.data,
@@ -274,18 +277,45 @@ namespace GatewayService.Controllers
                 //所以前移统计
                 RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
 
-                var updateCouponResp = await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
-                {
-                    Coupon = await _couponRepository.Query(eoResp.data.FromPlatform, eoResp.data.Tid).ContinueWith(t => t.Result.data),
-                    Event = EEvent.Received_Refund_EO
-                });
+                var coupon = await _couponRepository.Query(eoResp.data.FromPlatform, eoResp.data.Tid).ContinueWith(t => t.Result.data);
 
-                if (!updateCouponResp.ok)
+                //卡密未消费，作废掉
+                if(coupon.Status == ECouponStatus.Shipped)
                 {
-                    _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
-                    return Ok("update CouponDTO failed 可能是已经消费过了");
+                    var updateCouponResp = await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
+                    {
+                        Coupon = coupon,
+                        Event = EEvent.Received_Refund_EO
+                    });
+
+                    if (!updateCouponResp.ok)
+                    {
+                        _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
+                        return BadRequest("update CouponDTO failed 可能是已经消费过了");
+                    }
                 }
+                //卡密已消费
+                else if (coupon.Status == ECouponStatus.Consumed)
+                {
+                    //茶颜的卡密已消费，需要尝试一下代理退款
+                    if(eoResp.data.TargetProxy == ETargetProxy.sexytea)
+                    {
+                        _logger.Info($"sexytea coupon[{coupon.Coupon}] consumed, have a try to refund");
 
+                        await ApiCaller.PostAsync("https://huoshan.asynspetfood.top/api/gateway/admin/sexytea/refund", JsonSerializer.Serialize(new sexyteaRefundReq()
+                        {
+                            Coupon = coupon.Coupon,
+                            OrderNo = coupon.ProxyOrderId
+                        }));
+
+                        return Ok("ok, 已经消费，触发后台退款流程");
+                    }
+                  
+                }
+                else
+                {
+                    return BadRequest($"coupon status [{coupon.Status.ToString()}]  不处理");
+                }
 
                 return Ok("ok");
 
