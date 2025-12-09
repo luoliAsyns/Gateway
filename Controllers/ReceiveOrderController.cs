@@ -85,12 +85,14 @@ namespace GatewayService.Controllers
 
             _logger.Info($"received: fromPlatform:{fromPlatform}, timestamp:{timestamp}, aopic:{aopic}, sign:{sign}");
 
-            if (aopic == 2097152)
+            if (aopic == 2097152    //淘宝
+                || aopic == 1)      //闲鱼
             {
                 _logger.Info("receive agiso-pull 买家付款推送");
                 return await createExternalOrder();
             }
-            else if (aopic == 256)
+            else if (aopic == 256   //淘宝
+                || aopic == 8)      //闲鱼
             {
                 _logger.Info("receive agiso-pull 退款创建推送");
                 return await refundExternalOrder();
@@ -307,11 +309,10 @@ namespace GatewayService.Controllers
                     {
                         _logger.Info($"sexytea coupon[{coupon.Coupon}] consumed, have a try to refund");
 
-                        var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, coupon.ProxyOpenId);
+                        var result = await ApiCaller.PostAsync("http://localhost:8080/api/gateway/admin/sexytea/refund", JsonSerializer.Serialize(
+                            new sexyteaRefundReq() { Coupon = coupon.Coupon, OrderNo = coupon.ProxyOrderId}));
 
-                        var refundResult = await _sexyteaApis.OrderRefund(account, coupon.ProxyOrderId);
-
-                        return Ok("ok, 已经消费，触发后台退款流程");
+                        return Ok("ok, 已经消费，触发后台退款流程" + await result.Content.ReadAsStringAsync());
                     }
                   
                 }
