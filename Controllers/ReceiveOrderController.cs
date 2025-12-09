@@ -87,7 +87,7 @@ namespace GatewayService.Controllers
 
             switch (aopic)
             {
-                case 0:
+                case 1:
                     _logger.Info("receive agiso-pull 闲鱼买家付款推送");
                     return await createXianyuExternalOrder();
                 case 8:
