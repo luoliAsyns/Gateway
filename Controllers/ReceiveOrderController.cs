@@ -323,6 +323,8 @@ namespace GatewayService.Controllers
                     _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, convert to ExternalOrderDTO failed, skuid[{tradeInfoDTO.Data.sku}]");
                     return Ok($"可能是其他sku[{tradeInfoDTO.Data.sku}]");
                 }
+                //使用长id代替nick name
+                dto.SellerNick = orderCreateDto.seller_id.ToString();
 
                 _logger.Info($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, convert to ExternalOrderDTO success");
 
