@@ -306,7 +306,7 @@ namespace GatewayService.Controllers
                     {
                         try
                         {
-                            SkuIdMapItem item = RedisHelper.HGet<SkuIdMapItem>(RedisKeys.SkuId2Proxy, xyTradeData.sku.ToString());
+                            SkuIdMapItem item = RedisHelper.HGet<SkuIdMapItem>(RedisKeys.SkuId2Proxy, xyTradeData.sku);
                             return item;
                         }
                         catch
