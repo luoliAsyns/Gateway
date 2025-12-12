@@ -423,17 +423,13 @@ namespace GatewayService.Controllers
                 var coupon = await _couponRepository.Query(eoResp.data.FromPlatform, eoResp.data.Tid).ContinueWith(t => t.Result.data);
 
                 //卡密未消费，作废掉
-                if(coupon.Status == ECouponStatus.Shipped)
+                if (coupon.Status == ECouponStatus.Shipped)
                 {
-                    var updateCouponResp = await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
-                    {
-                        Coupon = coupon,
-                        Event = EEvent.Received_Refund_EO
-                    });
+                    var invalidateCouponResp = await _couponRepository.Invalidate(coupon.Coupon);
 
-                    if (!updateCouponResp.ok)
+                    if (!invalidateCouponResp.ok)
                     {
-                        _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
+                        _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, invalidate CouponDTO failed with fromPlatform:[XIANYU] tid: [{orderRefundDto.biz_order_id}]");
                         return BadRequest("update CouponDTO failed 可能是已经消费过了");
                     }
                 }
@@ -548,15 +544,11 @@ namespace GatewayService.Controllers
                 //卡密未消费，作废掉
                 if (coupon.Status == ECouponStatus.Shipped)
                 {
-                    var updateCouponResp = await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
-                    {
-                        Coupon = coupon,
-                        Event = EEvent.Received_Refund_EO
-                    });
+                    var invalidateCouponResp = await _couponRepository.Invalidate(coupon.Coupon);
 
-                    if (!updateCouponResp.ok)
+                    if (!invalidateCouponResp.ok)
                     {
-                        _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, update CouponDTO failed with fromPlatform:[XIANYU] tid: [{orderRefundDto.biz_order_id}]");
+                        _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, invalidate CouponDTO failed with fromPlatform:[XIANYU] tid: [{orderRefundDto.biz_order_id}]");
                         return BadRequest("update CouponDTO failed 可能是已经消费过了");
                     }
                 }
