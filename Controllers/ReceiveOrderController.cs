@@ -429,7 +429,7 @@ namespace GatewayService.Controllers
 
                     if (!invalidateCouponResp.ok)
                     {
-                        _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, invalidate CouponDTO failed with fromPlatform:[XIANYU] tid: [{orderRefundDto.biz_order_id}]");
+                        _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, invalidate CouponDTO failed with fromPlatform:[XIANYU] tid: [{orderRefundDto.Tid}]");
                         return BadRequest("update CouponDTO failed 可能是已经消费过了");
                     }
                 }
