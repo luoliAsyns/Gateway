@@ -27,6 +27,7 @@ namespace GatewayService.Controllers
         private static JsonSerializerOptions _options = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true, // 关键配置：忽略大小写
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
         private readonly IExternalOrderRepository _externalOrderRepository;
         private readonly ICouponRepository _couponRepository;
@@ -237,7 +238,7 @@ namespace GatewayService.Controllers
         [Route("api/gateway/prod/sexytea/consume")]
         public async Task<ApiResponse<bool>> Consume([FromBody] ConsumeInfoDTO consumeInfo)
         {
-            _logger.Info($"trigger SexyteaController.Consume with [{JsonSerializer.Serialize(consumeInfo)}] ");
+            _logger.Info($"trigger SexyteaController.Consume with [{JsonSerializer.Serialize(consumeInfo, _options)}] ");
 
             ApiResponse<bool> response = new ApiResponse<bool>();
             response.code = EResponseCode.Fail;
