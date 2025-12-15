@@ -221,9 +221,9 @@ namespace GatewayService
                 ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
             });
 
-            //app.UseMiddleware<RateLimitMiddleware>();
+            app.UseMiddleware<RateLimitMiddleware>();
 
-            //app.UseMiddleware<JwtMiddleware>();
+            app.UseMiddleware<JwtMiddleware>();
 
             app.MapControllers();
 
