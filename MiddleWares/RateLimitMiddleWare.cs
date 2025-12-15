@@ -22,8 +22,7 @@ namespace GatewayService.MiddleWares
             if (!RedisHelper.Exists("RateLimit_WINDOW_SECONDS"))
                 RedisHelper.Set("RateLimit_WINDOW_SECONDS", 1);
 
-            LIMIT = RedisHelper.Get<int>("RateLimit_LIMIT");
-            WINDOW_SECONDS = RedisHelper.Get<int>("RateLimit_WINDOW_SECONDS");
+          
             _next = next ?? throw new ArgumentNullException(nameof(next));
         }
 
@@ -37,7 +36,13 @@ namespace GatewayService.MiddleWares
             IPAddress ip = GetClientIpAddress(context);
 
             if (IsLocalOrLanIp(ip))
+            {
                 await _next(context);
+                return;
+            }
+
+            LIMIT = RedisHelper.Get<int>("RateLimit_LIMIT");
+            WINDOW_SECONDS = RedisHelper.Get<int>("RateLimit_WINDOW_SECONDS");
 
             var cacheKey = $"RateLimit_{ipAddress}";
 
