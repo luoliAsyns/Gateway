@@ -56,13 +56,8 @@ namespace GatewayService.MiddleWares
             {
                 // 3. 验证令牌并获取用户信息
                 var payload =await jwtService.ValidateToken(token);
-                Console.WriteLine("pass jwtService ValidateToken");
                 // 4. 将用户信息存入上下文，供后续控制器使用
                 context.Items["User"] = payload["name"].ToString();
-
-                Console.WriteLine($"set user as {context.Items["User"]}");
-                // 5. 继续处理请求
-                await _next(context);
             }
             catch (Exception ex)
             {
@@ -77,6 +72,8 @@ namespace GatewayService.MiddleWares
                 await context.Response.CompleteAsync();
                 return; // 终止后续中间件执行
             }
+
+            await _next(context);
         }
 
 
