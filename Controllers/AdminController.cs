@@ -490,6 +490,13 @@ namespace GatewayService.Controllers
             ApiResponse<TableItemVM> result = new();
             var eo = eoResp.data;
             var couponResp = await _couponRepository.Query(eo.FromPlatform, eo.Tid);
+
+            if(couponResp.data is null)
+            {
+                result.data = new TableItemVM(eo, couponResp.data, null);
+                result.code = LuoliCommon.Enums.EResponseCode.Success;
+                return result;
+            }
             var ciResp = await _consumeInfoRepository.ConsumeInfoQuery(
                 $"{eo.TargetProxy.ToString()}_consume_info",
                 couponResp.data.Coupon
