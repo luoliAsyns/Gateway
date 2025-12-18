@@ -193,16 +193,36 @@ namespace GatewayService.MiddleWares
         {
             try
             {
+                // 1. 校验 token 非空
+                if (string.IsNullOrWhiteSpace(token))
+                    throw new Exception("令牌不能为空");
+
+                // 2. 解码 JWT
                 var json = JwtBuilder.Create()
                       .WithAlgorithm(new HMACSHA256Algorithm())
-                      .WithSecret(SecretKey) // 验证时也需要相同的密钥
+                      .WithSecret(SecretKey)
                       .MustVerifySignature()
                       .Decode(token);
 
+                // 3. 校验解码结果非空
+                if (string.IsNullOrWhiteSpace(json))
+                    throw new Exception("令牌解码结果为空");
+
+                // 4. 反序列化并校验 Payload 非空
                 var payload = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
-                var userName = payload["name"].ToString();
+                if (payload == null || !payload.ContainsKey("name"))
+                    throw new Exception("令牌中缺少有效的用户名称（name）字段");
 
+                // 5. 校验 name 字段值非空
+                var userName = payload["name"]?.ToString();
+                if (string.IsNullOrWhiteSpace(userName))
+                    throw new Exception("令牌中的用户名称（name）字段值为空");
 
+                // 6. Redis 校验（兜底 Key 合法性）
+                var redisKey = $"admin.{userName}";
+                if (!(await RedisHelper.ExistsAsync(redisKey)))
+                    throw new Exception("令牌不存在于Redis（已失效）"); 
+                
                 if (!(await RedisHelper.ExistsAsync($"admin.{userName}")))
                     throw new Exception("token不存在于redis");
 
