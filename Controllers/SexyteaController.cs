@@ -246,14 +246,14 @@ namespace GatewayService.Controllers
 
             try
             {
-                var couponExist = await RedisHelper.ExistsAsync(consumeInfo.Coupon);
-
-                if (!couponExist)
+                var couponExist = await RedisHelper.ZScoreAsync(RedisKeys.NotUsedCoupons, consumeInfo.Coupon);
+                if (couponExist.HasValue)
                 {
                     response.data = false;
                     response.msg = "你的卡密不存在，可能是超时了";
                     return response;
                 }
+
 
                 var accounts = await RedisHelper.HGetAllAsync<Account>(RedisKeys.SexyteaTokenAccount);
 
@@ -285,7 +285,6 @@ namespace GatewayService.Controllers
                     response.data = false;
                     return response;
                 }
-
 
 
                 await _channel.BasicPublishAsync(exchange: string.Empty,
