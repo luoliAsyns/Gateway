@@ -7,6 +7,7 @@ using LuoliCommon.DTO.Coupon;
 using LuoliCommon.DTO.ExternalOrder;
 using LuoliCommon.Entities;
 using LuoliCommon.Enums;
+using LuoliCommon.Interfaces;
 using LuoliCommon.Logger;
 using LuoliUtils;
 using MethodTimer;
@@ -17,9 +18,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Web;
 using ThirdApis;
-using ThirdApis.Services.ConsumeInfo;
-using ThirdApis.Services.Coupon;
-using ThirdApis.Services.ExternalOrder;
 using static CSRedis.CSRedisClient;
 using static GatewayService.Controllers.SexyteaController;
 using static Grpc.Core.Metadata;
@@ -33,9 +31,9 @@ namespace GatewayService.Controllers
     public class ReceiveOrderController : Controller
     {
 
-        private readonly IExternalOrderRepository _externalOrderRepository;
-        private readonly ICouponRepository _couponRepository;
-        private readonly IConsumeInfoRepository _consumeInfoRepository;
+        private readonly IExternalOrderService _externalOrderService;
+        private readonly ICouponService _couponService;
+        private readonly IConsumeInfoService _consumeInfoService;
 
         private readonly ILogger _logger;
         private readonly IChannel _channel;
@@ -44,17 +42,17 @@ namespace GatewayService.Controllers
         private readonly SexyteaApis _sexyteaApis;
 
         public ReceiveOrderController(
-            IExternalOrderRepository orderRepository,
-            ICouponRepository couponService,
-            IConsumeInfoRepository consumeInfoRepository,
+            IExternalOrderService orderService,
+            ICouponService couponService,
+            IConsumeInfoService consumeInfoService,
             IChannel channel,
             AgisoApis agisoApis,
             SexyteaApis sexyteaApis,
             ILogger logger)
         {
-            _externalOrderRepository = orderRepository;
-            _couponRepository = couponService;
-            _consumeInfoRepository = consumeInfoRepository;
+            _externalOrderService = orderService;
+            _couponService = couponService;
+            _consumeInfoService = consumeInfoService;
 
             _logger = logger;
             _channel = channel;
@@ -392,7 +390,7 @@ namespace GatewayService.Controllers
             try
             {
 
-                var eoResp = await _externalOrderRepository.Get(orderRefundDto.Platform, orderRefundDto.Tid.ToString());
+                var eoResp = await _externalOrderService.Get(orderRefundDto.Platform, orderRefundDto.Tid.ToString());
                 if(!eoResp.ok || (eoResp.data is null ))
                 {
                     _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, not found related ExternalOrderDTO with fromPlatform:[{orderRefundDto.Platform}] tid: [{orderRefundDto.Tid}]");
@@ -401,7 +399,7 @@ namespace GatewayService.Controllers
               
                 
 
-                var updateEOResp = await _externalOrderRepository.Update(new LuoliCommon.DTO.ExternalOrder.UpdateRequest()
+                var updateEOResp = await _externalOrderService.Update(new LuoliCommon.DTO.ExternalOrder.UpdateRequest()
                 {
                      EO = eoResp.data,
                      Event = EEvent.Received_Refund_EO
@@ -419,12 +417,12 @@ namespace GatewayService.Controllers
                 //所以前移统计
                 RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
 
-                var coupon = await _couponRepository.Query(eoResp.data.FromPlatform, eoResp.data.Tid).ContinueWith(t => t.Result.data);
+                var coupon = await _couponService.Query(eoResp.data.FromPlatform, eoResp.data.Tid).ContinueWith(t => t.Result.data);
 
                 //卡密未消费，作废掉
                 if (coupon.Status == ECouponStatus.Shipped)
                 {
-                    var invalidateCouponResp = await _couponRepository.Invalidate(coupon.Coupon);
+                    var invalidateCouponResp = await _couponService.Invalidate(coupon.Coupon);
 
                     if (!invalidateCouponResp.ok)
                     {
@@ -511,7 +509,7 @@ namespace GatewayService.Controllers
             try
             {
 
-                var eoResp = await _externalOrderRepository.Get("XIANYU", orderRefundDto.biz_order_id.ToString());
+                var eoResp = await _externalOrderService.Get("XIANYU", orderRefundDto.biz_order_id.ToString());
                 if (!eoResp.ok || (eoResp.data is null))
                 {
                     _logger.Warn($"[{requestId}] ReceiveOrderController.ReceiveExternalOrder, not found related ExternalOrderDTO with fromPlatform:[XIANYU] tid: [{orderRefundDto.biz_order_id}]");
@@ -520,7 +518,7 @@ namespace GatewayService.Controllers
 
 
 
-                var updateEOResp = await _externalOrderRepository.Update(new LuoliCommon.DTO.ExternalOrder.UpdateRequest()
+                var updateEOResp = await _externalOrderService.Update(new LuoliCommon.DTO.ExternalOrder.UpdateRequest()
                 {
                     EO = eoResp.data,
                     Event = EEvent.Received_Refund_EO
@@ -538,12 +536,12 @@ namespace GatewayService.Controllers
                 //所以前移统计
                 RedisHelper.IncrByAsync(RedisKeys.Prom_ReceivedRefund);
 
-                var coupon = await _couponRepository.Query(eoResp.data.FromPlatform, eoResp.data.Tid).ContinueWith(t => t.Result.data);
+                var coupon = await _couponService.Query(eoResp.data.FromPlatform, eoResp.data.Tid).ContinueWith(t => t.Result.data);
 
                 //卡密未消费，作废掉
                 if (coupon.Status == ECouponStatus.Shipped)
                 {
-                    var invalidateCouponResp = await _couponRepository.Invalidate(coupon.Coupon);
+                    var invalidateCouponResp = await _couponService.Invalidate(coupon.Coupon);
 
                     if (!invalidateCouponResp.ok)
                     {
@@ -672,7 +670,7 @@ msg:{coreMsg}
         {
             _logger.Info($"trigger ReceiveOrder.QueryCoupon with coupon[{coupon}]");
 
-            return await _couponRepository.Query(coupon);
+            return await _couponService.Query(coupon);
         }
 
 
@@ -683,7 +681,7 @@ msg:{coreMsg}
         {
             _logger.Info($"trigger ReceiveOrder.QueryConsumeInfo with goodsType[{goodsType}],coupon[{coupon}]");
 
-            return await _consumeInfoRepository.ConsumeInfoQuery(goodsType,coupon);
+            return await _consumeInfoService.ConsumeInfoQuery(goodsType,coupon);
         }
     }
 

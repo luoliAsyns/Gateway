@@ -4,6 +4,7 @@ using LuoliCommon.DTO.ConsumeInfo.Sexytea;
 using LuoliCommon.DTO.Coupon;
 using LuoliCommon.Entities;
 using LuoliCommon.Enums;
+using LuoliCommon.Interfaces;
 using LuoliHelper.Entities;
 using LuoliUtils;
 using MethodTimer;
@@ -13,9 +14,6 @@ using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using ThirdApis;
-using ThirdApis.Services.ConsumeInfo;
-using ThirdApis.Services.Coupon;
-using ThirdApis.Services.ExternalOrder;
 using ILogger = LuoliCommon.Logger.ILogger;
 
 
@@ -29,9 +27,9 @@ namespace GatewayService.Controllers
             PropertyNameCaseInsensitive = true, // 关键配置：忽略大小写
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
-        private readonly IExternalOrderRepository _externalOrderRepository;
-        private readonly ICouponRepository _couponRepository;
-        private readonly IConsumeInfoRepository _consumeInfoRepository;
+        private readonly IExternalOrderService _externalOrderService;
+        private readonly ICouponService _couponService;
+        private readonly IConsumeInfoService _consumeInfoService;
 
         private readonly IChannel _channel;
         private readonly ILogger _logger;
@@ -41,14 +39,14 @@ namespace GatewayService.Controllers
 
 
         public SexyteaController(
-            IExternalOrderRepository orderRepository,
-            ICouponRepository couponService,
-            IConsumeInfoRepository consumeInfoRepository,
+            IExternalOrderService orderService,
+            ICouponService couponService,
+            IConsumeInfoService consumeInfoService,
            ILogger logger, IChannel channel, SexyteaApis sexyteaApis, SexyteaAccRecommend sexyteaTokenRecommend)
         {
-            _externalOrderRepository = orderRepository;
-            _couponRepository = couponService;
-            _consumeInfoRepository = consumeInfoRepository;
+            _externalOrderService = orderService;
+            _couponService = couponService;
+            _consumeInfoService = consumeInfoService;
             _channel = channel;
             _logger = logger;
             _sexyteaApis = sexyteaApis;
@@ -278,7 +276,7 @@ namespace GatewayService.Controllers
 
                 //coupon只能消费一次
                 //如果通过coupon查不到CI 说明是第一次消费
-                var existedCoupon = await _consumeInfoRepository.ConsumeInfoQuery(consumeInfo.GoodsType, consumeInfo.Coupon);
+                var existedCoupon = await _consumeInfoService.ConsumeInfoQuery(consumeInfo.GoodsType, consumeInfo.Coupon);
                 if (!(existedCoupon.data is null))
                 {
                     response.msg = "卡密已经使用过，请勿重复提交";
@@ -326,7 +324,7 @@ namespace GatewayService.Controllers
             response.data = null;
             response.code =  EResponseCode.Fail;
 
-            var couponDto = await _couponRepository.Query(coupon);
+            var couponDto = await _couponService.Query(coupon);
             if(couponDto.data?.ProxyOrderId.Length < 3)
             {
                 response.msg = "订单处理中";
@@ -362,7 +360,7 @@ namespace GatewayService.Controllers
                 if (couponDto.data.ProxyPayment != proxyPayment)
                 {
                     couponDto.data.ProxyPayment = proxyPayment;
-                    await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
+                    await _couponService.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
                     {
                         Coupon = couponDto.data,
                         Event = EEvent.ProxyQuery
@@ -408,7 +406,7 @@ namespace GatewayService.Controllers
 
             try
             {
-                var couponRep = await _couponRepository.Query(req.Coupon);
+                var couponRep = await _couponService.Query(req.Coupon);
 
                 var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, couponRep.data.ProxyOpenId);
 
@@ -429,7 +427,7 @@ namespace GatewayService.Controllers
                 if(response.data)
                 {
                    
-                    await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
+                    await _couponService.Update(new LuoliCommon.DTO.Coupon.UpdateRequest()
                     {
                         Coupon = couponRep.data,
                         Event = EEvent.ProxyRefund

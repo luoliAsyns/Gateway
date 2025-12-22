@@ -1,5 +1,4 @@
 ﻿using GatewayService.MiddleWares;
-using GatewayService.User;
 using LuoliCommon.DTO;
 using LuoliCommon.DTO.Admin;
 using LuoliCommon.DTO.ConsumeInfo.Sexytea;
@@ -7,6 +6,7 @@ using LuoliCommon.DTO.ExternalOrder;
 using LuoliCommon.DTO.User;
 using LuoliCommon.Entities;
 using LuoliCommon.Enums;
+using LuoliCommon.Interfaces;
 using LuoliUtils;
 using MethodTimer;
 using Microsoft.AspNetCore.Identity.Data;
@@ -18,9 +18,6 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using ThirdApis;
-using ThirdApis.Services.ConsumeInfo;
-using ThirdApis.Services.Coupon;
-using ThirdApis.Services.ExternalOrder;
 
 namespace GatewayService.Controllers
 {
@@ -31,24 +28,24 @@ namespace GatewayService.Controllers
 
         private readonly LuoliCommon.Logger.ILogger _logger;
 
-        private readonly IUserRepository _userRepository;
-        private readonly IExternalOrderRepository _externalOrderRepository;
-        private readonly ICouponRepository _couponRepository;
-        private readonly IConsumeInfoRepository _consumeInfoRepository;
+        private readonly IUserService _userService;
+        private readonly IExternalOrderService _externalOrderService;
+        private readonly ICouponService _couponService;
+        private readonly IConsumeInfoService _consumeInfoService;
 
         private readonly IJwtService _jwtService;
         public AdminController(LuoliCommon.Logger.ILogger logger,  IJwtService jwtService,
-            IUserRepository userRepository,
-            IExternalOrderRepository externalOrderRepository,
-            ICouponRepository couponService,
-            IConsumeInfoRepository consumeInfoRepository)
+            IUserService userService,
+            IExternalOrderService externalOrderService,
+            ICouponService couponService,
+            IConsumeInfoService consumeInfoService)
         {
             _logger = logger;
 
-            _userRepository = userRepository;
-            _externalOrderRepository = externalOrderRepository;
-            _couponRepository = couponService;
-            _consumeInfoRepository = consumeInfoRepository;
+            _userService = userService;
+            _externalOrderService = externalOrderService;
+            _couponService = couponService;
+            _consumeInfoService = consumeInfoService;
 
             _jwtService = jwtService;
         }
@@ -107,7 +104,7 @@ namespace GatewayService.Controllers
             resp.data = null;
 
 
-            var loginResp = await _userRepository.Login(loginRequest.UserName, loginRequest.Password);
+            var loginResp = await _userService.Login(loginRequest.UserName, loginRequest.Password);
 
             if (loginResp.data)
             {
@@ -176,7 +173,7 @@ namespace GatewayService.Controllers
             {
                 RedisHelper.DelAsync($"admin.{user}");
 
-                resp = await _userRepository.ChangePassword(chRequest.UserName, chRequest.Password);
+                resp = await _userService.ChangePassword(chRequest.UserName, chRequest.Password);
 
                 RedisHelper.DelAsync($"admin.{user}");
                 resp.msg = "修改密码成功";
@@ -212,7 +209,7 @@ namespace GatewayService.Controllers
             }
             await RedisHelper.DelAsync($"admin.{chRequest.UserName}");
 
-            resp = await _userRepository.Register(chRequest.UserName, "", true);
+            resp = await _userService.Register(chRequest.UserName, "", true);
 
             _logger.Info($"AdminController.Register success, remove token in redis: user[{chRequest.UserName}]");
             return resp;
@@ -441,7 +438,7 @@ namespace GatewayService.Controllers
             startTime = startTime?.AddHours(-8);
             endTime = endTime?.AddHours(-8);
 
-            var couponResp = await _couponRepository.PageQuery(page, size, couponStatus, startTime, endTime );
+            var couponResp = await _couponService.PageQuery(page, size, couponStatus, startTime, endTime );
 
 
             ApiResponse<PageResult<TableItemVM>> result = new ApiResponse<PageResult<TableItemVM>>();
@@ -456,8 +453,8 @@ namespace GatewayService.Controllers
             // 先创建所有并行任务
             var tasks = couponResp.data.Items.Select(async coupon =>
             {
-                var eoResp = await _externalOrderRepository.Get(coupon.ExternalOrderFromPlatform , coupon.ExternalOrderTid);
-                var ciResp = await _consumeInfoRepository.ConsumeInfoQuery(
+                var eoResp = await _externalOrderService.Get(coupon.ExternalOrderFromPlatform , coupon.ExternalOrderTid);
+                var ciResp = await _consumeInfoService.ConsumeInfoQuery(
                     $"{eoResp.data.TargetProxy.ToString()}_consume_info",
                     coupon.Coupon
                 );
@@ -484,12 +481,12 @@ namespace GatewayService.Controllers
 
             _logger.Info($"trigger AdminController.GetEO, tid[{tid}],fromPlatform [{fromPlatform}]");
 
-            var eoResp = await _externalOrderRepository.Get(fromPlatform, tid);
+            var eoResp = await _externalOrderService.Get(fromPlatform, tid);
 
 
             ApiResponse<TableItemVM> result = new();
             var eo = eoResp.data;
-            var couponResp = await _couponRepository.Query(eo.FromPlatform, eo.Tid);
+            var couponResp = await _couponService.Query(eo.FromPlatform, eo.Tid);
 
             if(couponResp.data is null)
             {
@@ -497,7 +494,7 @@ namespace GatewayService.Controllers
                 result.code = LuoliCommon.Enums.EResponseCode.Success;
                 return result;
             }
-            var ciResp = await _consumeInfoRepository.ConsumeInfoQuery(
+            var ciResp = await _consumeInfoService.ConsumeInfoQuery(
                 $"{eo.TargetProxy.ToString()}_consume_info",
                 couponResp.data.Coupon
             );
@@ -516,7 +513,7 @@ namespace GatewayService.Controllers
             string coupon = obj.Coupon;
             _logger.Info($"trigger AdminController.CouponInvalidate with coupon[{coupon}]");
 
-            return await _couponRepository.Invalidate(coupon);
+            return await _couponService.Invalidate(coupon);
         }
 
 
@@ -527,11 +524,11 @@ namespace GatewayService.Controllers
             string coupon = obj.Coupon;
             _logger.Info($"trigger AdminController.CouponRecover with coupon[{coupon}]");
 
-            var couponDto = (await _couponRepository.Query(coupon)).data;
-            var eoDto = (await _externalOrderRepository.Get(couponDto.ExternalOrderFromPlatform, couponDto.ExternalOrderTid)).data;
-            await _externalOrderRepository.Update( new UpdateRequest() { EO= eoDto , Event= EEvent.Receive_Manual_Recover_Coupon});
+            var couponDto = (await _couponService.Query(coupon)).data;
+            var eoDto = (await _externalOrderService.Get(couponDto.ExternalOrderFromPlatform, couponDto.ExternalOrderTid)).data;
+            await _externalOrderService.Update( new UpdateRequest() { EO= eoDto , Event= EEvent.Receive_Manual_Recover_Coupon});
 
-            return await _couponRepository.Update(new LuoliCommon.DTO.Coupon.UpdateRequest() {Coupon= couponDto, Event = EEvent.Receive_Manual_Recover_Coupon });
+            return await _couponService.Update(new LuoliCommon.DTO.Coupon.UpdateRequest() {Coupon= couponDto, Event = EEvent.Receive_Manual_Recover_Coupon });
         }
 
 

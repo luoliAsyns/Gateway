@@ -1,8 +1,8 @@
 ﻿
 using GatewayService.MiddleWares;
-using GatewayService.User;
 using LuoliCommon;
 using LuoliCommon.Enums;
+using LuoliCommon.Interfaces;
 using LuoliCommon.Logger;
 using LuoliHelper.Utils;
 using LuoliUtils;
@@ -12,9 +12,9 @@ using RabbitMQ.Client;
 using System.Data;
 using System.Reflection;
 using ThirdApis;
-using ThirdApis.Services.ConsumeInfo;
-using ThirdApis.Services.Coupon;
-using ThirdApis.Services.ExternalOrder;
+using Refit;
+
+
 using ILogger = LuoliCommon.Logger.ILogger;
 
 namespace GatewayService
@@ -103,10 +103,15 @@ namespace GatewayService
 
             builder.Services.AddScoped<SexyteaApis>();
 
-            builder.Services.AddScoped<IExternalOrderRepository, ExternalOrderRepository>();
-            builder.Services.AddScoped<ICouponRepository, CouponRepository>();
-            builder.Services.AddScoped<IConsumeInfoRepository, ConsumeInfoRepository>();
-            builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddRefitClient<IExternalOrderService>()
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://external-order-service:8080"));
+            builder.Services.AddRefitClient<ICouponService>()
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://coupon-service:8080"));
+            builder.Services.AddRefitClient<IConsumeInfoService>()
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://consume-info-service:8080"));
+            builder.Services.AddRefitClient<IUserService>()
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://user-service:8080"));
+
 
             builder.Services.AddScoped<IJwtService, JwtService>();
 
@@ -223,7 +228,11 @@ namespace GatewayService
 
             app.UseMiddleware<RateLimitMiddleware>();
 
+#if DEBUG
+
+#else
             app.UseMiddleware<JwtMiddleware>();
+#endif
 
             app.MapControllers();
 
