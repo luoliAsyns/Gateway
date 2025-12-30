@@ -93,25 +93,24 @@ namespace GatewayService
 
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddScoped<AsynsApis>(provider =>
-            {
-                ILogger logger = provider.GetRequiredService<ILogger>();
-                return new AsynsApis(logger, Config.KVPairs["AsynsApiUrl"]);
-               
-            });
+        
             builder.Services.AddScoped<AgisoApis>();
 
             builder.Services.AddScoped<SexyteaApis>();
 
-            builder.Services.AddRefitClient<IExternalOrderService>()
-                .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://external-order-service:8080"));
-            builder.Services.AddRefitClient<ICouponService>()
-                .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://coupon-service:8080"));
-            builder.Services.AddRefitClient<IConsumeInfoService>()
-                .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://consume-info-service:8080"));
-            builder.Services.AddRefitClient<IUserService>()
-                .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://user-service:8080"));
 
+            #region 注册 Refit部分   4个带数据库的服务
+
+            builder.Services.AddRefitClient<IExternalOrderService>()
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}external-order-service:8080"));
+            builder.Services.AddRefitClient<ICouponService>()
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}coupon-service:8080"));
+            builder.Services.AddRefitClient<IConsumeInfoService>()
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}consume-info-service:8080"));
+            builder.Services.AddRefitClient<IUserService>()
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}user-service:8080"));
+
+            #endregion
 
             builder.Services.AddScoped<IJwtService, JwtService>();
 
