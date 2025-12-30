@@ -104,7 +104,7 @@ namespace GatewayService.Controllers
             resp.data = null;
 
 
-            var loginResp = await _userService.Login(loginRequest.UserName, loginRequest.Password);
+            var loginResp = await _userService.Login(loginRequest);
 
             if (loginResp.data)
             {
@@ -173,7 +173,7 @@ namespace GatewayService.Controllers
             {
                 RedisHelper.DelAsync($"admin.{user}");
 
-                resp = await _userService.ChangePassword(chRequest.UserName, chRequest.Password);
+                resp = await _userService.ChangePassword(chRequest);
 
                 RedisHelper.DelAsync($"admin.{user}");
                 resp.msg = "修改密码成功";
@@ -209,7 +209,7 @@ namespace GatewayService.Controllers
             }
             await RedisHelper.DelAsync($"admin.{chRequest.UserName}");
 
-            resp = await _userService.Register(chRequest.UserName, "", true);
+            resp = await _userService.Register(new LuoliCommon.DTO.User.RegisterRequest() { UserName= chRequest.UserName, Gender=true, Phone= "" });
 
             _logger.Info($"AdminController.Register success, remove token in redis: user[{chRequest.UserName}]");
             return resp;
@@ -454,7 +454,7 @@ namespace GatewayService.Controllers
             var tasks = couponResp.data.Items.Select(async coupon =>
             {
                 var eoResp = await _externalOrderService.Get(coupon.ExternalOrderFromPlatform , coupon.ExternalOrderTid);
-                var ciResp = await _consumeInfoService.ConsumeInfoQuery(
+                var ciResp = await _consumeInfoService.GetAsync(
                     $"{eoResp.data.TargetProxy.ToString()}_consume_info",
                     coupon.Coupon
                 );
@@ -494,7 +494,7 @@ namespace GatewayService.Controllers
                 result.code = LuoliCommon.Enums.EResponseCode.Success;
                 return result;
             }
-            var ciResp = await _consumeInfoService.ConsumeInfoQuery(
+            var ciResp = await _consumeInfoService.GetAsync(
                 $"{eo.TargetProxy.ToString()}_consume_info",
                 couponResp.data.Coupon
             );
@@ -513,7 +513,10 @@ namespace GatewayService.Controllers
             string coupon = obj.Coupon;
             _logger.Info($"trigger AdminController.CouponInvalidate with coupon[{coupon}]");
 
-            return await _couponService.Invalidate(coupon);
+            //这里实际只用到了coupon
+            return await _couponService.Invalidate( 
+                new LuoliCommon.DTO.Coupon.UpdateErrorCodeRequest() { Coupon = coupon, ErrorCode = ECouponErrorCode.Default}
+                );
         }
 
 

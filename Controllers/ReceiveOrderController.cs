@@ -422,7 +422,11 @@ namespace GatewayService.Controllers
                 //卡密未消费，作废掉
                 if (coupon.Status == ECouponStatus.Shipped)
                 {
-                    var invalidateCouponResp = await _couponService.Invalidate(coupon.Coupon);
+                    var invalidateCouponResp = await _couponService.Invalidate(new UpdateErrorCodeRequest()
+                    {
+                        Coupon = coupon.Coupon,
+                        ErrorCode = ECouponErrorCode.Default
+                    });
 
                     if (!invalidateCouponResp.ok)
                     {
@@ -541,7 +545,11 @@ namespace GatewayService.Controllers
                 //卡密未消费，作废掉
                 if (coupon.Status == ECouponStatus.Shipped)
                 {
-                    var invalidateCouponResp = await _couponService.Invalidate(coupon.Coupon);
+                    var invalidateCouponResp = await _couponService.Invalidate(new UpdateErrorCodeRequest()
+                    {
+                        Coupon = coupon.Coupon,
+                        ErrorCode = ECouponErrorCode.Default
+                    });
 
                     if (!invalidateCouponResp.ok)
                     {
@@ -681,7 +689,7 @@ msg:{coreMsg}
         {
             _logger.Info($"trigger ReceiveOrder.QueryConsumeInfo with goodsType[{goodsType}],coupon[{coupon}]");
 
-            return await _consumeInfoService.ConsumeInfoQuery(goodsType,coupon);
+            return await _consumeInfoService.GetAsync(goodsType,coupon);
         }
     }
 
