@@ -245,7 +245,7 @@ namespace GatewayService.Controllers
             try
             {
                 var couponExist = await RedisHelper.ZScoreAsync(RedisKeys.NotUsedCoupons, consumeInfo.Coupon);
-                if (couponExist.HasValue)
+                if (!couponExist.HasValue)
                 {
                     response.data = false;
                     response.msg = "你的卡密不存在，可能是超时了";
