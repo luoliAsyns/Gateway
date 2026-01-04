@@ -529,7 +529,7 @@ namespace GatewayService.Controllers
 
             var couponDto = (await _couponService.Query(coupon)).data;
             var eoDto = (await _externalOrderService.Get(couponDto.ExternalOrderFromPlatform, couponDto.ExternalOrderTid)).data;
-            await _externalOrderService.Update( new UpdateRequest() { EO= eoDto , Event= EEvent.Receive_Manual_Recover_Coupon});
+            await _externalOrderService.Update( new LuoliCommon.DTO.ExternalOrder.UpdateRequest() { EO= eoDto , Event= EEvent.Receive_Manual_Recover_Coupon});
 
             return await _couponService.Update(new LuoliCommon.DTO.Coupon.UpdateRequest() {Coupon= couponDto, Event = EEvent.Receive_Manual_Recover_Coupon });
         }
