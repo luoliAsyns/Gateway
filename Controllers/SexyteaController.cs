@@ -29,6 +29,7 @@ namespace GatewayService.Controllers
         };
         private readonly IExternalOrderService _externalOrderService;
         private readonly ICouponService _couponService;
+        private readonly IProxyOrderService _proxyOrderService;
         private readonly IConsumeInfoService _consumeInfoService;
 
         private readonly IChannel _channel;
@@ -42,11 +43,13 @@ namespace GatewayService.Controllers
             IExternalOrderService orderService,
             ICouponService couponService,
             IConsumeInfoService consumeInfoService,
+            IProxyOrderService proxyOrderService,
            ILogger logger, IChannel channel, SexyteaApis sexyteaApis, SexyteaAccRecommend sexyteaTokenRecommend)
         {
             _externalOrderService = orderService;
             _couponService = couponService;
             _consumeInfoService = consumeInfoService;
+            _proxyOrderService = proxyOrderService;
             _channel = channel;
             _logger = logger;
             _sexyteaApis = sexyteaApis;
@@ -333,29 +336,23 @@ namespace GatewayService.Controllers
             }
 
 
-            var account = await RedisHelper.HGetAsync<Account>(RedisKeys.SexyteaTokenAccount, couponDto.data.ProxyOpenId);
+            var orderResp = await _proxyOrderService.GetAsync(coupon);
 
-            if(account is null || account.Exp < DateTime.Now)
+            if (!orderResp.ok)
             {
-                response.code = EResponseCode.Fail;
-                response.msg = $"Sexytea token[{couponDto.data.ProxyOpenId}] expired";
+                response.msg = "订单处理中";
                 response.data = null;
                 return response;
             }
 
-            var order = await _sexyteaApis.GetOrderInfo(account, couponDto.data.ProxyOrderId);
 
-            if (order is null)
-            {
-                response.code = EResponseCode.NotFound;
-                response.msg = "order not found";
-                response.data = null;
-                return response;
-            }
-
+            // 因为couponDto.data.ProxyPayment 初始值是0
+            // 客户如果下单了，至少会查询订单1次
+            // 此时更新数据
+            // 后续查询订单，值相同，则不会再次更新
             try
             {
-                JsonDocument doc = JsonDocument.Parse(order.ToString());
+                JsonDocument doc = JsonDocument.Parse(orderResp.data.Order);
                 decimal proxyPayment = doc.RootElement.GetProperty("data").GetProperty("balanceAmount").GetDecimal();
                 if (couponDto.data.ProxyPayment != proxyPayment)
                 {
@@ -376,7 +373,7 @@ namespace GatewayService.Controllers
 
             response.code = EResponseCode.Success;
             response.msg = "success";
-            response.data = order;
+            response.data = JsonSerializer.Deserialize<dynamic>( orderResp.data.Order);
             return response;
         }
 

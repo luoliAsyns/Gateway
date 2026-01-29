@@ -101,16 +101,34 @@ namespace GatewayService
             builder.Services.AddScoped<SexyteaApis>();
 
 
-            #region 注册 Refit部分   4个带数据库的服务
+            #region 注册 Refit部分   5个带数据库的服务
+
+#if DEBUG
+            builder.Services.AddRefitClient<IExternalOrderService>(refitSetting)
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://127.0.0.1:8081"));
+            builder.Services.AddRefitClient<ICouponService>(refitSetting)
+                 .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://127.0.0.1:8082"));
+            builder.Services.AddRefitClient<IProxyOrderService>(refitSetting)
+                 .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://127.0.0.1:8082"));
+            builder.Services.AddRefitClient<IConsumeInfoService>(refitSetting)
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://127.0.0.1:8083"));
+            builder.Services.AddRefitClient<IUserService>(refitSetting)
+                .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}user-service:8080"));
+#else
 
             builder.Services.AddRefitClient<IExternalOrderService>(refitSetting)
                 .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}external-order-service:8080"));
             builder.Services.AddRefitClient<ICouponService>(refitSetting)
                  .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}coupon-service:8080"));
+            builder.Services.AddRefitClient<IProxyOrderService>(refitSetting)
+                 .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}coupon-service:8080"));
             builder.Services.AddRefitClient<IConsumeInfoService>(refitSetting)
                 .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}consume-info-service:8080"));
             builder.Services.AddRefitClient<IUserService>(refitSetting)
                 .ConfigureHttpClient(c => c.BaseAddress = new Uri($"http://{Config.KVPairs["StartWith"]}user-service:8080"));
+
+#endif
+
 
             #endregion
 
