@@ -91,7 +91,7 @@ namespace GatewayService.Controllers
 
 
 
-
+        #region UserService
 
         [HttpPost]
         [Route("login")]
@@ -215,6 +215,10 @@ namespace GatewayService.Controllers
             return resp;
         }
 
+        #endregion
+
+
+        #region Prometheus
 
         [HttpGet]
         [Route("prom")]
@@ -295,6 +299,53 @@ namespace GatewayService.Controllers
         }
 
 
+        // 定义 Redis 指标与 Prometheus 指标的映射关系
+        private readonly Dictionary<string, (string PromName, string Help, string Type)> _metricMappings = new()
+        {
+            { RedisKeys.Prom_ReceivedOrders, ("order_pulled_total", "拉取订单", "counter") },
+            { RedisKeys.Prom_ReceivedRefund, ("refund_requests_total", "收到退款请求", "counter") },
+            { RedisKeys.Prom_CouponsGenerated, ("coupons_generated_total", "生成卡密", "counter") },
+            { RedisKeys.Prom_Shipped, ("shipped_success_total", "发货成功", "counter") },
+            { RedisKeys.Prom_ShipFailed, ("shipped_failed_total", "发货失败", "counter") },
+            { RedisKeys.Prom_ReceivedConsumeInfo, ("consume_info_received_total", "收到消费信息", "counter") },
+            { RedisKeys.Prom_InsertedConsumeInfo, ("consume_info_inserted_total", "插入消费信息", "counter") },
+            { RedisKeys.Prom_PlacedOrders, ("agent_orders_success_total", "代理下单成功", "counter") },
+            { RedisKeys.Prom_PlacedOrdersFailed, ("agent_orders_failed_total", "代理下单失败", "counter") }
+        };
+
+        [HttpGet]
+        [Route("metrics")]
+        public async Task<IActionResult> GetMetrics()
+        {
+            var sb = new StringBuilder();
+
+            // 遍历所有指标映射，读取 Redis 数据并生成 Prometheus 格式
+            foreach (var (redisKey, (promName, help, type)) in _metricMappings)
+            {
+                // 从 Redis 读取值（你的场景是 int 类型）
+                var value = await RedisHelper.GetAsync<int>(redisKey);
+
+                // 添加 HELP 注释（可选，建议添加）
+                sb.AppendLine($"# HELP {promName} {help}");
+
+                // 添加 TYPE 声明（必须）
+                sb.AppendLine($"# TYPE {promName} {type}");
+
+                // 添加指标值（无标签时直接写值）
+                sb.AppendLine($"{promName} {value}");
+
+                // 如需换行分隔不同指标，可加空行（可选）
+                sb.AppendLine();
+            }
+
+            // 返回 Prometheus 格式文本
+            return Content(sb.ToString(), "text/plain; charset=utf-8");
+        }
+
+        #endregion
+
+
+        #region 后台配置
 
         [HttpPost]
         [Time]
@@ -351,7 +402,6 @@ namespace GatewayService.Controllers
 
 
 
-
         [HttpPost]
         [Time]
         [Route("banned-branches")]
@@ -380,49 +430,120 @@ namespace GatewayService.Controllers
             return resp;
         }
 
-        // 定义 Redis 指标与 Prometheus 指标的映射关系
-        private readonly Dictionary<string, (string PromName, string Help, string Type)> _metricMappings = new()
-        {
-            { RedisKeys.Prom_ReceivedOrders, ("order_pulled_total", "拉取订单", "counter") },
-            { RedisKeys.Prom_ReceivedRefund, ("refund_requests_total", "收到退款请求", "counter") },
-            { RedisKeys.Prom_CouponsGenerated, ("coupons_generated_total", "生成卡密", "counter") },
-            { RedisKeys.Prom_Shipped, ("shipped_success_total", "发货成功", "counter") },
-            { RedisKeys.Prom_ShipFailed, ("shipped_failed_total", "发货失败", "counter") },
-            { RedisKeys.Prom_ReceivedConsumeInfo, ("consume_info_received_total", "收到消费信息", "counter") },
-            { RedisKeys.Prom_InsertedConsumeInfo, ("consume_info_inserted_total", "插入消费信息", "counter") },
-            { RedisKeys.Prom_PlacedOrders, ("agent_orders_success_total", "代理下单成功", "counter") },
-            { RedisKeys.Prom_PlacedOrdersFailed, ("agent_orders_failed_total", "代理下单失败", "counter") }
-        };
 
         [HttpGet]
-        [Route("metrics")]
-        public async Task<IActionResult> GetMetrics()
+        [Route("sku-map")]
+        public async Task<ApiResponse<dynamic>> GetSkuIdMap()
         {
-            var sb = new StringBuilder();
 
-            // 遍历所有指标映射，读取 Redis 数据并生成 Prometheus 格式
-            foreach (var (redisKey, (promName, help, type)) in _metricMappings)
+            _logger.Info($"trigger SexyteaController.GetSkuIdMap");
+
+            ApiResponse<dynamic> response = new ApiResponse<dynamic>();
+            response.code = EResponseCode.Fail;
+            response.data = null;
+
+            try
             {
-                // 从 Redis 读取值（你的场景是 int 类型）
-                var value = await RedisHelper.GetAsync<int>(redisKey);
+                Dictionary<string, SkuIdMapItem> map = await RedisHelper.HGetAllAsync<SkuIdMapItem>("skuid2proxy");
+                response.data = new
+                {
+                    map = map,
+                    allOptions = map.Values.Select(item => item.TargetProxy).Distinct()
+                };
+                response.msg = string.Empty;
+                response.code = EResponseCode.Success;
 
-                // 添加 HELP 注释（可选，建议添加）
-                sb.AppendLine($"# HELP {promName} {help}");
+                _logger.Info($"SexyteaController.GetSkuIdMap, length[{map?.Count}]]");
 
-                // 添加 TYPE 声明（必须）
-                sb.AppendLine($"# TYPE {promName} {type}");
-
-                // 添加指标值（无标签时直接写值）
-                sb.AppendLine($"{promName} {value}");
-
-                // 如需换行分隔不同指标，可加空行（可选）
-                sb.AppendLine();
+                return response;
             }
-
-            // 返回 Prometheus 格式文本
-            return Content(sb.ToString(), "text/plain; charset=utf-8");
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.GetSkuIdMap ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = null;
+                return response;
+            }
         }
 
+
+        [HttpPost]
+        [Route("sku-map-item-update")]
+        public async Task<ApiResponse<bool>> UpdateSkuIdMapItem([FromBody] SkuIdMapChangeRequest req)
+        {
+
+            _logger.Info($"trigger SexyteaController.UpdateSkuIdMapItem skuid[{req.skuId}] newValue[{JsonSerializer.Serialize(req.item)}]");
+
+
+            ApiResponse<bool> response = new ApiResponse<bool>();
+            response.code = EResponseCode.Fail;
+            response.data = false;
+
+            try
+            {
+                var result = await RedisHelper.HSetAsync("skuid2proxy", req.skuId, req.item);
+                response.data = result;
+                response.msg = string.Empty;
+                response.code = EResponseCode.Success;
+
+                _logger.Info($"SexyteaController.UpdateSkuIdMapItem, result[{result}]");
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.UpdateSkuIdMapItem ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = false;
+                return response;
+            }
+        }
+
+
+        [HttpPost]
+        [Route("sku-map-item-delete")]
+        public async Task<ApiResponse<bool>> DeleteSkuIdMapItem([FromBody] SkuIdMapChangeRequest req)
+        {
+
+            _logger.Info($"trigger SexyteaController.DeleteSkuIdMapItem skuid[{req.skuId}] ");
+
+
+            ApiResponse<bool> response = new ApiResponse<bool>();
+            response.code = EResponseCode.Fail;
+            response.data = false;
+
+            try
+            {
+                var result = await RedisHelper.HDelAsync("skuid2proxy", req.skuId);
+                response.data = true;
+                response.msg = string.Empty;
+                response.code = EResponseCode.Success;
+
+                _logger.Info($"SexyteaController.DeleteSkuIdMapItem success");
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("while SexyteaController.DeleteSkuIdMapItem ");
+                _logger.Error(ex.Message);
+                response.msg = ex.Message;
+                response.code = EResponseCode.Fail;
+                response.data = false;
+                return response;
+            }
+        }
+
+
+
+        #endregion
+
+
+        #region 后台订单管理
 
         [HttpGet]
         [Route("order-page-query")]
@@ -535,116 +656,14 @@ namespace GatewayService.Controllers
         }
 
 
-
-        [HttpGet]
-        [Route("sku-map")]
-        public async Task<ApiResponse<dynamic>> GetSkuIdMap()
-        {
-
-            _logger.Info($"trigger SexyteaController.GetSkuIdMap");
-
-            ApiResponse<dynamic> response = new ApiResponse<dynamic>();
-            response.code = EResponseCode.Fail;
-            response.data =  null;
-
-            try
-            {
-                Dictionary<string, SkuIdMapItem> map = await RedisHelper.HGetAllAsync<SkuIdMapItem>("skuid2proxy");
-                response.data = new
-                {
-                    map = map,
-                    allOptions = map.Values.Select(item=>item.TargetProxy).Distinct()
-                };
-                response.msg = string.Empty;
-                response.code = EResponseCode.Success;
-
-                _logger.Info($"SexyteaController.GetSkuIdMap, length[{map?.Count}]]");
-
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("while SexyteaController.GetSkuIdMap ");
-                _logger.Error(ex.Message);
-                response.msg = ex.Message;
-                response.code = EResponseCode.Fail;
-                response.data = null;
-                return response;
-            }
-        }
+        #endregion
 
 
-        [HttpPost]
-        [Route("sku-map-item-update")]
-        public async Task<ApiResponse<bool>> UpdateSkuIdMapItem([FromBody] SkuIdMapChangeRequest req)
-        {
-
-            _logger.Info($"trigger SexyteaController.UpdateSkuIdMapItem skuid[{req.skuId}] newValue[{JsonSerializer.Serialize(req.item)}]");
-
-
-            ApiResponse<bool> response = new ApiResponse<bool>();
-            response.code = EResponseCode.Fail;
-            response.data = false;
-
-            try
-            {
-                var result = await RedisHelper.HSetAsync("skuid2proxy", req.skuId , req.item);
-                response.data = result;
-                response.msg = string.Empty;
-                response.code = EResponseCode.Success;
-
-                _logger.Info($"SexyteaController.UpdateSkuIdMapItem, result[{result}]");
-
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("while SexyteaController.UpdateSkuIdMapItem ");
-                _logger.Error(ex.Message);
-                response.msg = ex.Message;
-                response.code = EResponseCode.Fail;
-                response.data = false;
-                return response;
-            }
-        }
-
-
-        [HttpPost]
-        [Route("sku-map-item-delete")]
-        public async Task<ApiResponse<bool>> DeleteSkuIdMapItem([FromBody] SkuIdMapChangeRequest req)
-        {
-
-            _logger.Info($"trigger SexyteaController.DeleteSkuIdMapItem skuid[{req.skuId}] ");
-
-
-            ApiResponse<bool> response = new ApiResponse<bool>();
-            response.code = EResponseCode.Fail;
-            response.data = false;
-
-            try
-            {
-                var result = await RedisHelper.HDelAsync("skuid2proxy", req.skuId);
-                response.data = true;
-                response.msg = string.Empty;
-                response.code = EResponseCode.Success;
-
-                _logger.Info($"SexyteaController.DeleteSkuIdMapItem success");
-
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("while SexyteaController.DeleteSkuIdMapItem ");
-                _logger.Error(ex.Message);
-                response.msg = ex.Message;
-                response.code = EResponseCode.Fail;
-                response.data = false;
-                return response;
-            }
-        }
-
+        #region 代理订单归档
         
 
+        
+        #endregion
 
     }
 }
